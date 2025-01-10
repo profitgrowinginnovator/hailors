@@ -1,6 +1,8 @@
 
 # Hailo RS: Minimal Rust Binding for LibHailoRT
 
+IMPORTANT: Still work in progress
+
 Hailo RS is a minimal Rust binding for **LibHailoRT** designed to make it easy to deploy AI models on the **Hailo AI Hat+** directly from a **Raspberry Pi**. This project simplifies the interaction with Hailo’s powerful inference engine, allowing seamless integration of Rust-based AI applications.
 
 ---
