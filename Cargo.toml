@@ -1,0 +1,43 @@
+[package]
+name = "hailors"
+version = "0.1.0"
+edition = "2021"
+#build = "build.rs"
+
+[dependencies]
+autocxx = { version = "0.27.1", optional = true }
+
+# These dependencies are required for FFI and autocxx integration
+cxx = "1.0.136"
+anyhow = "1.0.95"
+
+# Include dependencies needed for build.rs to function
+[build-dependencies]
+autocxx-build = "0.27.1"
+cc = "1.2.7"
+
+[features]
+default = ["autocxx"]
+
+#[package.metadata]
+#include = ["src/lib.rs", "build.rs"]
+
+[profile.dev]
+#incremental = false
+debug = true
+
+#[profile.release]
+#lto = true
+#codegen-units = 1
+
+
+
+[[bin]]
+name = "main"
+path = "src/main.rs"
+
+[lib]
+#crate-type = ["bin"]
+#crate-type = ["staticlib"]
+name = "hailors"
+path = "src/lib.rs"
