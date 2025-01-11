@@ -10,7 +10,14 @@ typedef void* hailo_vdevice_handle;
 typedef void* hailo_network_group_handle;
 typedef void* hailo_vstream_handle;
 
+// Add the following if missing:
+
+
+
+
 hailo_status hailors_vdevice_create(hailo_vdevice_handle *vdevice);
+hailo_status hailors_release_vdevice(hailo_vdevice_handle vdevice);
+
 hailo_status hailors_load_hef(const char *hef_path, hailo_network_group_handle *network_group);
 hailo_status hailors_infer(
     hailo_network_group_handle network_group,
@@ -19,8 +26,8 @@ hailo_status hailors_infer(
     hailo_output_vstream_params_by_name_t *outputs_params,
     hailo_stream_raw_buffer_by_name_t *output_buffers, size_t outputs_count,
     size_t frames_count);
-hailo_status hailors_release_vdevice(hailo_vdevice_handle vdevice);
-hailo_status hailors_scan_devices(char ***device_list, size_t *device_count);
+
+hailo_status hailors_scan_devices(hailo_device_id_t *device_ids, size_t *device_count);
 
 void hailors_free_device_list(char **device_list, size_t device_count);
 hailo_status hailors_create_vstreams(

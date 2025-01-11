@@ -1,7 +1,7 @@
 use autocxx::prelude::*;
 //use std::ffi::CStr;
 use std::ptr;
-use std::ffi::CString;
+use std::ffi::{CString,CStr};
 use std::os::raw::c_char;
 
 include_cpp! {
@@ -15,8 +15,8 @@ include_cpp! {
     generate!("hailors_load_hef")
 
     generate!("hailors_release_vdevice")
-   // generate!("hailo_make_input_vstream_params")
-   // generate!("hailo_make_output_vstream_params")
+    generate!("hailors_scan_devices")
+
 }
 extern "C" {
     fn hailors_create_vstreams(
@@ -30,9 +30,6 @@ extern "C" {
         output_vstreams: *mut *mut c_void,
         output_count: *mut usize,
     ) -> i32;
-
-    fn hailors_scan_devices(device_list: *mut *mut c_char, device_count: *mut usize) -> i32;
-    fn hailors_free_device_list(device_list: *mut *mut c_char, device_count: usize);
  
     fn hailors_infer(
             network_group: *mut c_void,
@@ -62,6 +59,19 @@ impl std::fmt::Debug for HailoStatus {
             HailoStatus::Success => write!(f, "HailoStatus::Success"),
             HailoStatus::Failure => write!(f, "HailoStatus::Failure"),
         }
+    }
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug)]
+pub struct HailoDeviceId {
+    pub id: [u8; 64], // Assuming HAILO_MAX_DEVICE_ID_LENGTH is 64
+}
+
+impl HailoDeviceId {
+    fn as_cstr(&self) -> &CStr {
+        let end = self.id.iter().position(|&c| c == 0).unwrap_or(self.id.len());
+        unsafe { CStr::from_bytes_with_nul_unchecked(&self.id[..=end]) }
     }
 }
 
@@ -193,22 +203,27 @@ pub fn close_device(device_handle: HailoDeviceHandle) -> Result<(), String> {
 }
 
 pub fn scan_devices() -> Result<Vec<String>, String> {
-    let mut device_list: *mut *mut c_char = std::ptr::null_mut();
-    let mut device_count: usize = 0;
+    const MAX_DEVICES: usize = 32;
 
-    let status = unsafe { hailors_scan_devices(device_list, &mut device_count) };
-    if status != HailoStatus::Success as i32 {
-        return Err("Failed to scan devices".to_string());
+    let mut device_ids: [HailoDeviceId; MAX_DEVICES] = unsafe { std::mem::zeroed() };
+    let mut device_count: usize = MAX_DEVICES;
+
+    let status = unsafe { ffi::hailors_scan_devices(device_ids.as_mut_ptr() as *mut _, &mut device_count) };
+
+    if status as i32 != HailoStatus::Success as i32 {
+        return Err(format!("Failed to scan devices"));
     }
 
     let mut devices = Vec::new();
-    unsafe {
-        for i in 0..device_count {
-            let c_str = std::ffi::CStr::from_ptr(*device_list.add(i));
-            devices.push(c_str.to_str().unwrap().to_string());
+    for i in 0..device_count {
+        let c_str = device_ids[i].as_cstr();
+        match c_str.to_str() {
+            Ok(device_str) => devices.push(device_str.to_string()),
+            Err(_) => return Err("Invalid UTF-8 device ID".to_string()),
         }
-        hailors_free_device_list(device_list, device_count);
     }
 
     Ok(devices)
 }
+
+

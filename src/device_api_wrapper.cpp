@@ -110,61 +110,21 @@ extern "C" hailo_status hailors_close_device(hailo_device_handle device) {
     return HAILO_SUCCESS;
 }
 
-
-extern "C" void hailors_free_device_list(char **device_list, size_t device_count)
-{
-    for (size_t i = 0; i < device_count; ++i) {
-        free(device_list[i]);
+extern "C" hailo_status hailors_scan_devices(hailo_device_id_t *device_ids, size_t *device_count) {
+    if (!device_ids || !device_count) {
+        return HAILO_INVALID_ARGUMENT;  // Handle null pointers
     }
-    free(device_list);
+
+    // Call the Hailo API function directly with the default parameters
+    hailo_status status = hailo_scan_devices(nullptr, device_ids, device_count);
+    if (status != HAILO_SUCCESS) {
+        *device_count = 0;  // No devices found or an error occurred
+        return status;
+    }
+
+    return HAILO_SUCCESS;  // Successfully scanned devices
 }
 
-extern "C" hailo_status hailors_scan_devices(char ***device_list, size_t *device_count)
-{
-    if (!device_list || !device_count) {
-        //std::cerr << "Error: device_list or device_count is null." << std::endl;
-        return HAILO_INVALID_ARGUMENT;
-    }
-
-    auto scan_result = Device::scan_pcie();
-    if (!scan_result) {
-        *device_count = 0;
-        *device_list = nullptr;  // No devices found
-        return scan_result.status();  // Return failure
-    }
-
-    const auto &devices_info = scan_result.value();
-    *device_count = devices_info.size();
-
-    if (*device_count == 0) {
-        *device_list = nullptr;  // No devices to list
-        return HAILO_SUCCESS;
-    }
-
-    *device_list = static_cast<char **>(malloc(sizeof(char *) * (*device_count)));
-    if (!*device_list) {
-        return HAILO_OUT_OF_HOST_MEMORY;  // Handle memory allocation failure
-    }
-
-    for (size_t i = 0; i < *device_count; ++i) {
-        (*device_list)[i] = static_cast<char *>(malloc(64 * sizeof(char)));
-        if (!(*device_list)[i]) {
-            for (size_t j = 0; j < i; ++j) {
-                free((*device_list)[j]);
-            }
-            free(*device_list);
-            return HAILO_OUT_OF_HOST_MEMORY;
-        }
-
-        snprintf((*device_list)[i], 64, "%04x:%02x:%02x.%x",
-                 devices_info[i].domain,
-                 devices_info[i].bus,
-                 devices_info[i].device,
-                 devices_info[i].func);
-    }
-
-    return HAILO_SUCCESS;
-}
 
 
 

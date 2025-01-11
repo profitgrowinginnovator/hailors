@@ -1,0 +1,154 @@
+hailort_s    839                              root  cwd       DIR              179,2      4096          2 /
+hailort_s    839                              root  rtd       DIR              179,2      4096          2 /
+hailort_s    839                              root  txt       REG              179,2   5439320       4091 /usr/local/bin/hailort_service
+hailort_s    839                              root  mem       REG              179,2   1651408      54831 /usr/lib/aarch64-linux-gnu/libc.so.6
+hailort_s    839                              root  mem       REG              179,2    133448       3335 /usr/lib/aarch64-linux-gnu/libgcc_s.so.1
+hailort_s    839                              root  mem       REG              179,2    591960     118173 /usr/lib/aarch64-linux-gnu/libm.so.6
+hailort_s    839                              root  mem       REG              179,2   2174296         61 /usr/lib/aarch64-linux-gnu/libstdc++.so.6.0.30
+hailort_s    839                              root  mem       REG              179,2     67528     118181 /usr/lib/aarch64-linux-gnu/libpthread.so.0
+hailort_s    839                              root  mem       REG              179,2     67616     118183 /usr/lib/aarch64-linux-gnu/librt.so.1
+hailort_s    839                              root  mem       REG              179,2   9737992       4089 /usr/lib/libhailort.so.4.19.0
+hailort_s    839                              root  mem       REG              179,2    202912      54825 /usr/lib/aarch64-linux-gnu/ld-linux-aarch64.so.1
+hailort_s    839                              root    0u      CHR                1,3       0t0          6 /dev/null
+hailort_s    839                              root    1u      CHR                1,3       0t0          6 /dev/null
+hailort_s    839                              root    2u      CHR                1,3       0t0          6 /dev/null
+hailort_s    839                              root    3w      REG              179,2         0     523514 /root/.hailo/hailort/hailort.log
+hailort_s    839                              root    4w      REG              179,2         0    1045319 /var/log/hailo/hailort.log
+hailort_s    839                              root    5u  a_inode               0,14         0       1065 [eventpoll:6,7]
+hailort_s    839                              root    6u  a_inode               0,14         0       1065 [eventfd:8]
+hailort_s    839                              root    7u     unix 0x0000000083c73bb6       0t0       4724 ///tmp/hailort_uds.sock type=STREAM (LISTEN)
+hailort_s    839    847 hailort_s             root  cwd       DIR              179,2      4096          2 /
+hailort_s    839    847 hailort_s             root  rtd       DIR              179,2      4096          2 /
+hailort_s    839    847 hailort_s             root  txt       REG              179,2   5439320       4091 /usr/local/bin/hailort_service
+hailort_s    839    847 hailort_s             root  mem       REG              179,2   1651408      54831 /usr/lib/aarch64-linux-gnu/libc.so.6
+hailort_s    839    847 hailort_s             root  mem       REG              179,2    133448       3335 /usr/lib/aarch64-linux-gnu/libgcc_s.so.1
+hailort_s    839    847 hailort_s             root  mem       REG              179,2    591960     118173 /usr/lib/aarch64-linux-gnu/libm.so.6
+hailort_s    839    847 hailort_s             root  mem       REG              179,2   2174296         61 /usr/lib/aarch64-linux-gnu/libstdc++.so.6.0.30
+hailort_s    839    847 hailort_s             root  mem       REG              179,2     67528     118181 /usr/lib/aarch64-linux-gnu/libpthread.so.0
+hailort_s    839    847 hailort_s             root  mem       REG              179,2     67616     118183 /usr/lib/aarch64-linux-gnu/librt.so.1
+hailort_s    839    847 hailort_s             root  mem       REG              179,2   9737992       4089 /usr/lib/libhailort.so.4.19.0
+hailort_s    839    847 hailort_s             root  mem       REG              179,2    202912      54825 /usr/lib/aarch64-linux-gnu/ld-linux-aarch64.so.1
+hailort_s    839    847 hailort_s             root    0u      CHR                1,3       0t0          6 /dev/null
+hailort_s    839    847 hailort_s             root    1u      CHR                1,3       0t0          6 /dev/null
+hailort_s    839    847 hailort_s             root    2u      CHR                1,3       0t0          6 /dev/null
+hailort_s    839    847 hailort_s             root    3w      REG              179,2         0     523514 /root/.hailo/hailort/hailort.log
+hailort_s    839    847 hailort_s             root    4w      REG              179,2         0    1045319 /var/log/hailo/hailort.log
+hailort_s    839    847 hailort_s             root    5u  a_inode               0,14         0       1065 [eventpoll:6,7]
+hailort_s    839    847 hailort_s             root    6u  a_inode               0,14         0       1065 [eventfd:8]
+hailort_s    839    847 hailort_s             root    7u     unix 0x0000000083c73bb6       0t0       4724 ///tmp/hailort_uds.sock type=STREAM (LISTEN)
+hailort_s    839    851 default-e             root  cwd       DIR              179,2      4096          2 /
+hailort_s    839    851 default-e             root  rtd       DIR              179,2      4096          2 /
+hailort_s    839    851 default-e             root  txt       REG              179,2   5439320       4091 /usr/local/bin/hailort_service
+hailort_s    839    851 default-e             root  mem       REG              179,2   1651408      54831 /usr/lib/aarch64-linux-gnu/libc.so.6
+hailort_s    839    851 default-e             root  mem       REG              179,2    133448       3335 /usr/lib/aarch64-linux-gnu/libgcc_s.so.1
+hailort_s    839    851 default-e             root  mem       REG              179,2    591960     118173 /usr/lib/aarch64-linux-gnu/libm.so.6
+hailort_s    839    851 default-e             root  mem       REG              179,2   2174296         61 /usr/lib/aarch64-linux-gnu/libstdc++.so.6.0.30
+hailort_s    839    851 default-e             root  mem       REG              179,2     67528     118181 /usr/lib/aarch64-linux-gnu/libpthread.so.0
+hailort_s    839    851 default-e             root  mem       REG              179,2     67616     118183 /usr/lib/aarch64-linux-gnu/librt.so.1
+hailort_s    839    851 default-e             root  mem       REG              179,2   9737992       4089 /usr/lib/libhailort.so.4.19.0
+hailort_s    839    851 default-e             root  mem       REG              179,2    202912      54825 /usr/lib/aarch64-linux-gnu/ld-linux-aarch64.so.1
+hailort_s    839    851 default-e             root    0u      CHR                1,3       0t0          6 /dev/null
+hailort_s    839    851 default-e             root    1u      CHR                1,3       0t0          6 /dev/null
+hailort_s    839    851 default-e             root    2u      CHR                1,3       0t0          6 /dev/null
+hailort_s    839    851 default-e             root    3w      REG              179,2         0     523514 /root/.hailo/hailort/hailort.log
+hailort_s    839    851 default-e             root    4w      REG              179,2         0    1045319 /var/log/hailo/hailort.log
+hailort_s    839    851 default-e             root    5u  a_inode               0,14         0       1065 [eventpoll:6,7]
+hailort_s    839    851 default-e             root    6u  a_inode               0,14         0       1065 [eventfd:8]
+hailort_s    839    851 default-e             root    7u     unix 0x0000000083c73bb6       0t0       4724 ///tmp/hailort_uds.sock type=STREAM (LISTEN)
+hailort_s    839    852 resolver-             root  cwd       DIR              179,2      4096          2 /
+hailort_s    839    852 resolver-             root  rtd       DIR              179,2      4096          2 /
+hailort_s    839    852 resolver-             root  txt       REG              179,2   5439320       4091 /usr/local/bin/hailort_service
+hailort_s    839    852 resolver-             root  mem       REG              179,2   1651408      54831 /usr/lib/aarch64-linux-gnu/libc.so.6
+hailort_s    839    852 resolver-             root  mem       REG              179,2    133448       3335 /usr/lib/aarch64-linux-gnu/libgcc_s.so.1
+hailort_s    839    852 resolver-             root  mem       REG              179,2    591960     118173 /usr/lib/aarch64-linux-gnu/libm.so.6
+hailort_s    839    852 resolver-             root  mem       REG              179,2   2174296         61 /usr/lib/aarch64-linux-gnu/libstdc++.so.6.0.30
+hailort_s    839    852 resolver-             root  mem       REG              179,2     67528     118181 /usr/lib/aarch64-linux-gnu/libpthread.so.0
+hailort_s    839    852 resolver-             root  mem       REG              179,2     67616     118183 /usr/lib/aarch64-linux-gnu/librt.so.1
+hailort_s    839    852 resolver-             root  mem       REG              179,2   9737992       4089 /usr/lib/libhailort.so.4.19.0
+hailort_s    839    852 resolver-             root  mem       REG              179,2    202912      54825 /usr/lib/aarch64-linux-gnu/ld-linux-aarch64.so.1
+hailort_s    839    852 resolver-             root    0u      CHR                1,3       0t0          6 /dev/null
+hailort_s    839    852 resolver-             root    1u      CHR                1,3       0t0          6 /dev/null
+hailort_s    839    852 resolver-             root    2u      CHR                1,3       0t0          6 /dev/null
+hailort_s    839    852 resolver-             root    3w      REG              179,2         0     523514 /root/.hailo/hailort/hailort.log
+hailort_s    839    852 resolver-             root    4w      REG              179,2         0    1045319 /var/log/hailo/hailort.log
+hailort_s    839    852 resolver-             root    5u  a_inode               0,14         0       1065 [eventpoll:6,7]
+hailort_s    839    852 resolver-             root    6u  a_inode               0,14         0       1065 [eventfd:8]
+hailort_s    839    852 resolver-             root    7u     unix 0x0000000083c73bb6       0t0       4724 ///tmp/hailort_uds.sock type=STREAM (LISTEN)
+hailort_s    839    853 grpc_glob             root  cwd       DIR              179,2      4096          2 /
+hailort_s    839    853 grpc_glob             root  rtd       DIR              179,2      4096          2 /
+hailort_s    839    853 grpc_glob             root  txt       REG              179,2   5439320       4091 /usr/local/bin/hailort_service
+hailort_s    839    853 grpc_glob             root  mem       REG              179,2   1651408      54831 /usr/lib/aarch64-linux-gnu/libc.so.6
+hailort_s    839    853 grpc_glob             root  mem       REG              179,2    133448       3335 /usr/lib/aarch64-linux-gnu/libgcc_s.so.1
+hailort_s    839    853 grpc_glob             root  mem       REG              179,2    591960     118173 /usr/lib/aarch64-linux-gnu/libm.so.6
+hailort_s    839    853 grpc_glob             root  mem       REG              179,2   2174296         61 /usr/lib/aarch64-linux-gnu/libstdc++.so.6.0.30
+hailort_s    839    853 grpc_glob             root  mem       REG              179,2     67528     118181 /usr/lib/aarch64-linux-gnu/libpthread.so.0
+hailort_s    839    853 grpc_glob             root  mem       REG              179,2     67616     118183 /usr/lib/aarch64-linux-gnu/librt.so.1
+hailort_s    839    853 grpc_glob             root  mem       REG              179,2   9737992       4089 /usr/lib/libhailort.so.4.19.0
+hailort_s    839    853 grpc_glob             root  mem       REG              179,2    202912      54825 /usr/lib/aarch64-linux-gnu/ld-linux-aarch64.so.1
+hailort_s    839    853 grpc_glob             root    0u      CHR                1,3       0t0          6 /dev/null
+hailort_s    839    853 grpc_glob             root    1u      CHR                1,3       0t0          6 /dev/null
+hailort_s    839    853 grpc_glob             root    2u      CHR                1,3       0t0          6 /dev/null
+hailort_s    839    853 grpc_glob             root    3w      REG              179,2         0     523514 /root/.hailo/hailort/hailort.log
+hailort_s    839    853 grpc_glob             root    4w      REG              179,2         0    1045319 /var/log/hailo/hailort.log
+hailort_s    839    853 grpc_glob             root    5u  a_inode               0,14         0       1065 [eventpoll:6,7]
+hailort_s    839    853 grpc_glob             root    6u  a_inode               0,14         0       1065 [eventfd:8]
+hailort_s    839    853 grpc_glob             root    7u     unix 0x0000000083c73bb6       0t0       4724 ///tmp/hailort_uds.sock type=STREAM (LISTEN)
+hailort_s    839    856 grpcpp_sy             root  cwd       DIR              179,2      4096          2 /
+hailort_s    839    856 grpcpp_sy             root  rtd       DIR              179,2      4096          2 /
+hailort_s    839    856 grpcpp_sy             root  txt       REG              179,2   5439320       4091 /usr/local/bin/hailort_service
+hailort_s    839    856 grpcpp_sy             root  mem       REG              179,2   1651408      54831 /usr/lib/aarch64-linux-gnu/libc.so.6
+hailort_s    839    856 grpcpp_sy             root  mem       REG              179,2    133448       3335 /usr/lib/aarch64-linux-gnu/libgcc_s.so.1
+hailort_s    839    856 grpcpp_sy             root  mem       REG              179,2    591960     118173 /usr/lib/aarch64-linux-gnu/libm.so.6
+hailort_s    839    856 grpcpp_sy             root  mem       REG              179,2   2174296         61 /usr/lib/aarch64-linux-gnu/libstdc++.so.6.0.30
+hailort_s    839    856 grpcpp_sy             root  mem       REG              179,2     67528     118181 /usr/lib/aarch64-linux-gnu/libpthread.so.0
+hailort_s    839    856 grpcpp_sy             root  mem       REG              179,2     67616     118183 /usr/lib/aarch64-linux-gnu/librt.so.1
+hailort_s    839    856 grpcpp_sy             root  mem       REG              179,2   9737992       4089 /usr/lib/libhailort.so.4.19.0
+hailort_s    839    856 grpcpp_sy             root  mem       REG              179,2    202912      54825 /usr/lib/aarch64-linux-gnu/ld-linux-aarch64.so.1
+hailort_s    839    856 grpcpp_sy             root    0u      CHR                1,3       0t0          6 /dev/null
+hailort_s    839    856 grpcpp_sy             root    1u      CHR                1,3       0t0          6 /dev/null
+hailort_s    839    856 grpcpp_sy             root    2u      CHR                1,3       0t0          6 /dev/null
+hailort_s    839    856 grpcpp_sy             root    3w      REG              179,2         0     523514 /root/.hailo/hailort/hailort.log
+hailort_s    839    856 grpcpp_sy             root    4w      REG              179,2         0    1045319 /var/log/hailo/hailort.log
+hailort_s    839    856 grpcpp_sy             root    5u  a_inode               0,14         0       1065 [eventpoll:6,7]
+hailort_s    839    856 grpcpp_sy             root    6u  a_inode               0,14         0       1065 [eventfd:8]
+hailort_s    839    856 grpcpp_sy             root    7u     unix 0x0000000083c73bb6       0t0       4724 ///tmp/hailort_uds.sock type=STREAM (LISTEN)
+bash       13894                           maarten  cwd       DIR              179,2      4096    1333571 /home/maarten/hailors
+code       13999                           maarten  cwd       DIR              179,2      4096    1333571 /home/maarten/hailors
+code       13999  14002 ThreadPoo          maarten  cwd       DIR              179,2      4096    1333571 /home/maarten/hailors
+code       13999  14003 ThreadPoo          maarten  cwd       DIR              179,2      4096    1333571 /home/maarten/hailors
+code       13999  14004 code               maarten  cwd       DIR              179,2      4096    1333571 /home/maarten/hailors
+code       13999  14005 code               maarten  cwd       DIR              179,2      4096    1333571 /home/maarten/hailors
+code       13999  14006 code               maarten  cwd       DIR              179,2      4096    1333571 /home/maarten/hailors
+code       13999  14007 code               maarten  cwd       DIR              179,2      4096    1333571 /home/maarten/hailors
+code       13999  14010 code               maarten  cwd       DIR              179,2      4096    1333571 /home/maarten/hailors
+rust-anal  14083                           maarten  cwd       DIR              179,2      4096    1333571 /home/maarten/hailors
+rust-anal  14083  14091 LspServer          maarten  cwd       DIR              179,2      4096    1333571 /home/maarten/hailors
+rust-anal  14083  14092 LspServer          maarten  cwd       DIR              179,2      4096    1333571 /home/maarten/hailors
+rust-anal  14083  14093 LspServer          maarten  cwd       DIR              179,2      4096    1333571 /home/maarten/hailors
+rust-anal  14083  14121 VfsLoader          maarten  cwd       DIR              179,2      4096    1333571 /home/maarten/hailors
+rust-anal  14083  14123 Worker             maarten  cwd       DIR              179,2      4096    1333571 /home/maarten/hailors
+rust-anal  14083  14124 Worker             maarten  cwd       DIR              179,2      4096    1333571 /home/maarten/hailors
+rust-anal  14083  14125 Worker             maarten  cwd       DIR              179,2      4096    1333571 /home/maarten/hailors
+rust-anal  14083  14126 Worker             maarten  cwd       DIR              179,2      4096    1333571 /home/maarten/hailors
+rust-anal  14083  14127 Worker             maarten  cwd       DIR              179,2      4096    1333571 /home/maarten/hailors
+rust-anal  14083  14533 VfsLoader          maarten  cwd       DIR              179,2      4096    1333571 /home/maarten/hailors
+rust-anal  14083  14534 VfsLoader          maarten  cwd       DIR              179,2      4096    1333571 /home/maarten/hailors
+rust-anal  14083  14535 VfsLoader          maarten  cwd       DIR              179,2      4096    1333571 /home/maarten/hailors
+rust-anal  14083  14536 VfsLoader          maarten  cwd       DIR              179,2      4096    1333571 /home/maarten/hailors
+rust-anal  14083  18853 Flycheck           maarten  cwd       DIR              179,2      4096    1333571 /home/maarten/hailors
+rust-anal  14528                           maarten  cwd       DIR              179,2      4096    1333571 /home/maarten/hailors
+rust-anal  14528                           maarten  mem       REG              179,2   5906712    1441180 /home/maarten/hailors/target/debug/deps/libproc_macro_error_attr-c6ce0d8bf1efe384.so
+rust-anal  14528                           maarten  mem       REG              179,2   8618368    1441696 /home/maarten/hailors/target/debug/deps/libautocxx_macro-f19cff24a8399e07.so
+rust-anal  14528                           maarten  mem       REG              179,2   9662504    1441672 /home/maarten/hailors/target/debug/deps/libserde_derive-42352673b98c349b.so
+rust-anal  14528                           maarten  mem       REG              179,2   9790896    1441667 /home/maarten/hailors/target/debug/deps/libcxxbridge_macro-f61280b77687fdcd.so
+rust-anal  14528                           maarten  mem       REG              179,2   8571656    1441645 /home/maarten/hailors/target/debug/deps/libmiette_derive-e38fc65a19e95958.so
+rust-anal  14528                           maarten  mem       REG              179,2   6619480    1441586 /home/maarten/hailors/target/debug/deps/libaquamarine-00402e2f6cbe975b.so
+rust-anal  14528                           maarten  mem       REG              179,2   8701392    1441651 /home/maarten/hailors/target/debug/deps/libthiserror_impl-710692e6491bb74a.so
+rust-anal  14528                           maarten  mem       REG              179,2   5894864    1428757 /home/maarten/hailors/target/debug/deps/librustversion-1a12d696ee868f07.so
+rust-anal  14528                           maarten  mem       REG              179,2   5774008    1439841 /home/maarten/hailors/target/debug/deps/libindoc-da89b0389a402cb6.so
+sudo      119093                              root  cwd       DIR              179,2      4096    1333571 /home/maarten/hailors
+grep      119094                           maarten  cwd       DIR              179,2      4096    1333571 /home/maarten/hailors
+grep      119094                           maarten    1w      REG              179,2         0    1298205 /home/maarten/hailors/hailo.log
+sudo      119095                              root  cwd       DIR              179,2      4096    1333571 /home/maarten/hailors
+lsof      119096                              root  cwd       DIR              179,2      4096    1333571 /home/maarten/hailors
+lsof      119097                              root  cwd       DIR              179,2      4096    1333571 /home/maarten/hailors
