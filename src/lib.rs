@@ -5,6 +5,7 @@ use std::ptr;
 use std::ffi::CString;
 use status::HailoStatus;
 
+
 include_cpp! {
     #include "device_api_wrapper.hpp"
     safety!(unsafe_ffi)
@@ -17,6 +18,9 @@ include_cpp! {
     generate!("hailors_create_input_vstreams")
     generate!("hailors_create_output_vstreams")
     generate!("hailo_status")
+    generate!("hailo_get_input_stream_info")
+    generate!("hailo_get_output_stream_info")
+    generate!("hailo_stream_info_t")
 }
 
 #[repr(C)]
@@ -39,6 +43,67 @@ extern "C" {
         frames_count: usize,
     ) -> i32;
 }
+
+const HAILO_MAX_STREAM_NAME_SIZE: usize = 64;
+
+#[repr(C)]
+#[derive(Debug)]
+pub struct HailoStreamInfo {
+    pub name: [u8; 64],  // Adjust size as needed
+    pub user_buffer_format: i32,
+    pub shape: HailoVstreamShape,  // Assuming shape includes dimensions
+}
+
+#[repr(C)]
+#[derive(Debug)]
+pub struct HailoVstreamShape {
+    pub height: u32,
+    pub width: u32,
+    pub features: u32,  // Channels
+}
+
+
+#[repr(u32)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum HailoVstreamStatsFlags {
+    None = 0,
+    MeasureFPS = 1 << 0,
+    MeasureLatency = 1 << 1,
+}
+
+#[repr(u32)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum HailoPipelineElemStatsFlags {
+    None = 0,
+    MeasureFPS = 1 << 0,
+    MeasureLatency = 1 << 1,
+    MeasureQueueSize = 1 << 2,
+}
+
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct HailoVstreamParams {
+    pub user_buffer_format: i32,
+    pub timeout_ms: u32,
+    pub queue_size: u32,
+    pub vstream_stats_flags: u32,
+    pub pipeline_elements_stats_flags: u32,
+}
+
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct HailoInputVstreamParamsByName {
+    pub name: [u8; 64],
+    pub params: HailoVstreamParams,
+}
+
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct HailoOutputVstreamParamsByName {
+    pub name: [u8; 64],
+    pub params: HailoVstreamParams,
+}
+
 
 pub fn scan_devices() -> Result<Vec<String>, String> {
     const MAX_DEVICES: usize = 32;
@@ -118,46 +183,114 @@ pub fn load_hef(hef_path: &str, vdevice_handle: *mut c_void) -> Result<*mut c_vo
         Err(format!("Failed to load HEF: {}", hailo_status))
     }
 }
-
 pub fn create_vstreams(
     network_group: *mut c_void,
     format_type: HailoFormatType,
-    max_params_count: usize,
 ) -> Result<(Vec<Vec<u8>>, Vec<Vec<u8>>), String> {
-    let mut input_vstreams: Vec<*mut c_void> = vec![std::ptr::null_mut(); max_params_count];
-    let mut output_vstreams: Vec<*mut c_void> = vec![std::ptr::null_mut(); max_params_count];
+    let mut input_vstreams: Vec<*mut ffi::hailo_input_vstream_t> = vec![std::ptr::null_mut(); max_params_count];
+    let mut output_vstreams: Vec<*mut ffi::hailo_output_vstream_t> = vec![std::ptr::null_mut(); max_params_count];
 
+
+    // Query input stream info
     let mut input_count: usize = 0;
-    let mut output_count: usize = 0;
+    unsafe {
+        ffi::hailo_get_input_stream_info(
+            network_group,
+            std::ptr::null_mut(),
+            &mut input_count,
+        );
+    }
+    let mut input_streams_info = vec![HailoStreamInfo {
+        name: [0; 64],
+        user_buffer_format: 0,
+        shape: HailoVstreamShape {
+            height: 0,
+            width: 0,
+            features: 0,
+        },
+    }; input_count];
 
-    // Call to `hailors_create_input_vstreams`
+    unsafe {
+        ffi::hailo_get_input_stream_info(
+            network_group,
+            input_streams_info.as_mut_ptr(),
+            &mut input_count,
+        );
+    }
+
+    let mut input_params: Vec<HailoInputVstreamParamsByName> = Vec::with_capacity(input_count);
+    for i in 0..input_count {
+        let stream_info = &input_streams_info[i];
+        input_params.push(HailoInputVstreamParamsByName {
+            name: stream_info.name,
+            params: HailoVstreamParams {
+                user_buffer_format: stream_info.user_buffer_format,
+                timeout_ms: 1000,
+                queue_size: 16,
+                vstream_stats_flags: HailoVstreamStatsFlags::MeasureFPS as u32 | HailoVstreamStatsFlags::MeasureLatency as u32,
+                pipeline_elements_stats_flags: HailoPipelineElemStatsFlags::MeasureFPS as u32 | HailoPipelineElemStatsFlags::MeasureQueueSize as u32,
+            },
+        });
+    }
+
+    // Similar logic for output streams
+    let mut output_count: usize = 0;
+    unsafe {
+        ffi::hailo_get_output_stream_info(
+            network_group,
+            std::ptr::null_mut(),
+        );
+    }
+    let mut output_streams_info = vec![std::mem::zeroed::<ffi::hailo_stream_info_t>(); output_count];
+
+    unsafe {
+        ffi::hailo_get_output_stream_info(
+            network_group,
+            output_streams_info.as_mut_ptr(),
+        );
+    }
+
+    let mut output_params: Vec<HailoOutputVstreamParamsByName> = Vec::with_capacity(output_count);
+    for i in 0..output_count {
+        let stream_info = &output_streams_info[i];
+        output_params.push(HailoOutputVstreamParamsByName {
+            name: stream_info.name,
+            params: HailoVstreamParams {
+                user_buffer_format: stream_info.user_buffer_format,
+                timeout_ms: 1000,
+                queue_size: 16,
+                vstream_stats_flags: HailoVstreamStatsFlags::MeasureFPS as u32 | HailoVstreamStatsFlags::MeasureLatency as u32,
+                pipeline_elements_stats_flags: HailoPipelineElemStatsFlags::MeasureFPS as u32 | HailoPipelineElemStatsFlags::MeasureQueueSize as u32,
+            },
+        });
+    }
+
+    // Call hailors_create_input_vstreams
     let status = unsafe {
         ffi::hailors_create_input_vstreams(
             network_group,
-            std::ptr::null_mut(),
-            max_params_count,
+            input_params.as_mut_ptr() as *mut _,
+            input_params.len(),
             input_vstreams.as_mut_ptr(),
             &mut input_count,
         )
     };
-    let hailo_status = HailoStatus::from_i32(status as i32);
-    if hailo_status != HailoStatus::Success {
-        return Err(format!("Failed to create input vstreams: {:?}", hailo_status));
+    if HailoStatus::from_i32(status as i32) != HailoStatus::Success {
+        return Err("Failed to create input vstreams".to_string());
     }
 
-    // Call to `hailors_create_output_vstreams`
+    // Call hailors_create_output_vstreams
     let status = unsafe {
         ffi::hailors_create_output_vstreams(
             network_group,
-            std::ptr::null_mut(),
-            max_params_count,
+            output_params.as_mut_ptr() as *mut _,
+            output_params.len(),
             output_vstreams.as_mut_ptr(),
             &mut output_count,
         )
     };
-    let hailo_status = HailoStatus::from_i32(status as i32);
-    if hailo_status != HailoStatus::Success {
-        return Err(format!("Failed to create output vstreams: {:?}", hailo_status));
+    if HailoStatus::from_i32(status as i32) != HailoStatus::Success {
+        return Err("Failed to create output vstreams".to_string());
     }
 
     println!("Created {} input vstreams and {} output vstreams", input_count, output_count);
@@ -167,6 +300,7 @@ pub fn create_vstreams(
 
     Ok((input_buffers, output_buffers))
 }
+
 
 pub fn run_inference(
     network_group: *mut c_void,
