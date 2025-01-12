@@ -68,7 +68,7 @@ fn main() {
         };
 
         // Create VDevice
-        let mut vdevice = match create_vdevice() {
+        let vdevice = match create_vdevice() {
             Ok(v) => v,
             Err(e) => {
                 eprintln!("Error creating VDevice: {}", e);
@@ -87,8 +87,7 @@ fn main() {
                 return;
             }
         };
-
-        let network_group_name = "default"; // Adjust this if necessary
+ 
         let max_params_count = 10;
 
         // Input/output stream format

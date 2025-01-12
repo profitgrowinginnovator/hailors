@@ -1,5 +1,7 @@
 #include "device_api_wrapper.hpp"
 #include "hailort.h"
+#include "hailort.hpp"  
+
 #include <cstring>
 #include <memory>
 #include <iostream>
@@ -110,11 +112,10 @@ extern "C" hailo_status hailors_create_input_vstreams(
     }
 
     hailo_status status = hailo_create_input_vstreams(
-        static_cast<hailo_configured_network_group *>(network_group),
+        *static_cast<hailo_configured_network_group *>(network_group),
         input_params,
         input_params_count,
-        input_vstreams,
-        input_count
+        *reinterpret_cast<hailo_input_vstream **>(input_vstreams)
     );
 
     return status;
@@ -132,11 +133,10 @@ extern "C" hailo_status hailors_create_output_vstreams(
     }
 
     hailo_status status = hailo_create_output_vstreams(
-        static_cast<hailo_configured_network_group *>(network_group),
+        *static_cast<hailo_configured_network_group *>(network_group),
         output_params,
         output_params_count,
-        output_vstreams,
-        output_count
+        *reinterpret_cast<hailo_output_vstream **>(output_vstreams)
     );
 
     return status;
@@ -157,7 +157,7 @@ extern "C" hailo_status hailors_infer(
     }
 
     hailo_status status = hailo_infer(
-        static_cast<hailo_configured_network_group *>(network_group),
+        *static_cast<hailo_configured_network_group *>(network_group),
         input_params,
         input_buffers,
         inputs_count,

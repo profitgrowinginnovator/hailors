@@ -10,6 +10,7 @@ autocxx = { version = "0.27.1", optional = true }
 # These dependencies are required for FFI and autocxx integration
 cxx = "1.0.136"
 anyhow = "1.0.95"
+clap = "4.5.26"
 
 # Include dependencies needed for build.rs to function
 [build-dependencies]

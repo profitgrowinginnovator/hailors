@@ -1,3 +1,4 @@
+#[derive(PartialEq, Debug)]
 pub enum HailoStatus {
     Success = 0,  // No error
     Uninitialized = 1,  // No error code initialized
