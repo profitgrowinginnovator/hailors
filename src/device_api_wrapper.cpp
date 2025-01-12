@@ -43,6 +43,40 @@ extern "C" hailo_status hailors_vdevice_create(hailo_vdevice_handle *vdevice) {
     return HAILO_SUCCESS;
 }
 
+extern "C" hailo_status get_shape(const hailo_stream_info_t *info, hailo_3d_image_shape_t *out_shape) {
+    if (!info || !out_shape) {
+        return HAILO_INVALID_ARGUMENT;
+    }
+
+    if (info->direction == HAILO_H2D_STREAM) { // Host-to-Device, assuming relevant for shape
+        *out_shape = info->shape;
+        return HAILO_SUCCESS;
+    }
+
+    return HAILO_INVALID_OPERATION; // No shape for non-image streams
+}
+
+extern "C" hailo_status get_input_stream_info(hailo_input_stream *stream, hailo_stream_info_t *info) {
+    if (!stream || !info) {
+        return HAILO_INVALID_ARGUMENT;
+    }
+    return hailo_get_input_stream_info(*stream, info);
+}
+
+extern "C" hailo_status get_output_stream_info(hailo_output_stream *stream, hailo_stream_info_t *info) {
+    if (!stream || !info) {
+        return HAILO_INVALID_ARGUMENT;
+    }
+    return hailo_get_output_stream_info(*stream, info);
+}
+
+extern "C" const char* get_stream_name(const hailo_stream_info_t *info) {
+    if (!info) {
+        return nullptr;
+    }
+    return info->name;
+}
+
 extern "C" hailo_status hailors_load_hef(const char *hef_path, hailo_network_group_handle *network_group, hailo_vdevice_handle optional_vdevice) {
     if (!hef_path || !network_group) {
         return HAILO_INVALID_ARGUMENT;

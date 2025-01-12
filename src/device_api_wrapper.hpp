@@ -38,6 +38,10 @@ extern "C" {
         size_t outputs_count,
         size_t frames_count
     );
-}
 
+    hailo_status get_shape(const hailo_stream_info_t *info, hailo_3d_image_shape_t *out_shape);
+    const char* get_stream_name(const hailo_stream_info_t *info);
+    hailo_status get_input_stream_info(hailo_input_stream *stream, hailo_stream_info_t *info);
+    hailo_status get_output_stream_info(hailo_output_stream *stream, hailo_stream_info_t *info);
+}   hailo_status get_stream_info(hailo_input_stream *stream, hailo_stream_info_t *info);
 #endif // DEVICE_API_WRAPPER_HPP
