@@ -1,15 +1,38 @@
-use hailors::{scan_devices, open_device, close_device, create_vdevice, load_hef, create_vstreams, run_inference, release_vdevice};
-use std::env;
-use std::ptr;
-use autocxx::c_void; 
+use hailors::{
+    scan_devices, open_device, close_device, create_vdevice, load_hef, create_vstreams,
+    run_inference, release_vdevice, HailoFormatType, InferenceBuffers,
+};
+use clap::{Arg, Command};
 
 fn main() {
-    let args: Vec<String> = env::args().collect();
-    let device_id = if args.len() > 1 {
-        Some(args[1].clone())
-    } else {
-        None
-    };
+    // Create command-line argument parser
+    let matches = Command::new("Hailo Inference Example")
+        .version("1.0")
+        .author("Your Name <your.email@example.com>")
+        .about("Runs Hailo inference with optional device and HEF file selection")
+        .arg(
+            Arg::new("device_id")
+                .short('d')
+                .long("device_id")
+                .value_name("DEVICE_ID")
+                .help("Specify the device ID to use. If not set, the first available device will be used."),
+        )
+        .arg(
+            Arg::new("hef")
+                .long("hef")
+                .value_name("HEF_PATH")
+                .help("Specify the HEF file path. If not set, the default HEF file will be used."),
+        )
+        .get_matches();
+
+    // Parse arguments
+    let device_id = matches.get_one::<String>("device_id").cloned();
+    let hef_path = matches
+        .get_one::<String>("hef")
+        .cloned()
+        .unwrap_or_else(|| "/usr/share/hailo-models/yolov6n_h8.hef".to_string());
+
+    println!("Using HEF file: {}", hef_path);
 
     let device_ids = match device_id {
         Some(id) => vec![id],
@@ -23,89 +46,87 @@ fn main() {
             }
             Ok(_) => {
                 eprintln!("No devices found.");
-                vec![] 
-                //return;
+                return;
             }
             Err(e) => {
                 eprintln!("Error scanning devices: {}", e);
-                vec![] 
-                //return;
+                return;
             }
         },
     };
 
     for id in device_ids {
-        match open_device(&id) {
+        let device_handle = match open_device(&id) {
             Ok(handle) => {
                 println!("Successfully opened device: {}", id);
-
-                // Close the device after use
-                if let Err(e) = close_device(handle) {
-                    eprintln!("Error closing device {}: {}", id, e);
-                } else {
-                    println!("Successfully closed device: {}", id);
-                }
+                handle
             }
-            Err(e) => eprintln!("Error opening device {}: {}", id, e),
+            Err(e) => {
+                eprintln!("Error opening device {}: {}", id, e);
+                continue;
+            }
+        };
+
+        // Create VDevice
+        let mut vdevice = match create_vdevice() {
+            Ok(v) => v,
+            Err(e) => {
+                eprintln!("Error creating VDevice: {}", e);
+                let _ = close_device(device_handle);
+                return;
+            }
+        };
+
+        // Load HEF and configure network group
+        let network_group = match load_hef(&hef_path, vdevice) {
+            Ok(ng) => ng,
+            Err(e) => {
+                eprintln!("Error loading HEF: {}", e);
+                let _ = release_vdevice(vdevice);
+                let _ = close_device(device_handle);
+                return;
+            }
+        };
+
+        let network_group_name = "default"; // Adjust this if necessary
+        let max_params_count = 10;
+
+        // Input/output stream format
+        let format_type = HailoFormatType::UINT8;
+
+        // Create input and output vstreams
+        let (input_buffers, output_buffers) = match create_vstreams(network_group, format_type, max_params_count) {
+            Ok((input, output)) => (input, output),
+            Err(e) => {
+                eprintln!("Error creating vstreams: {}", e);
+                let _ = release_vdevice(vdevice);
+                let _ = close_device(device_handle);
+                return;
+            }
+        };
+
+        // Create inference buffers (automatically allocates input/output buffers)
+        let inference_buffers = InferenceBuffers::new(&input_buffers, &output_buffers);
+
+        // Number of frames for inference
+        let frames_count = 1;
+
+        // Run inference
+        match run_inference(network_group, &inference_buffers, frames_count) {
+            Ok(()) => println!("Inference completed successfully!"),
+            Err(e) => eprintln!("Inference failed: {}", e),
         }
-    }
 
-    let hef_path = env::args().nth(1).unwrap_or_else(|| "/usr/share/hailo-models/yolov6n_h8.hef".to_string());
-
-    // Create VDevice
-    let vdevice = match create_vdevice() {
-        Ok(v) => v,
-        Err(e) => {
-            eprintln!("Error creating VDevice: {}", e);
-            return;
+        // Release the VDevice
+        if let Err(e) = release_vdevice(vdevice) {
+            eprintln!("Error releasing VDevice: {}", e);
         }
-    };
 
-    // Load HEF and configure network group
-    let network_group = match load_hef(&hef_path) {
-        Ok(ng) => ng,
-        Err(e) => {
-            eprintln!("Error loading HEF: {}", e);
-            let _ = release_vdevice(vdevice);
-            return;
+        // Close the device
+        if let Err(e) = close_device(device_handle) {
+            eprintln!("Error closing device {}: {}", id, e);
+        } else {
+            println!("Successfully closed device: {}", id);
         }
-    };
-
-    // Create input/output virtual streams
-    let (input_vstreams, output_vstreams) = match create_vstreams(network_group) {
-        Ok((inputs, outputs)) => (inputs, outputs),
-        Err(e) => {
-            eprintln!("Error creating virtual streams: {}", e);
-            let _ = release_vdevice(vdevice);
-            return;
-        }
-    };
-
-    // Placeholder for the input/output params and buffers
-    let inputs_params: *mut c_void = ptr::null_mut();  // Replace with actual input vstream params
-    let input_buffers: *mut c_void = ptr::null_mut();  // Replace with actual input buffers
-    let outputs_params: *mut c_void = ptr::null_mut(); // Replace with actual output vstream params
-    let output_buffers: *mut c_void = ptr::null_mut(); // Replace with actual output buffers
-
-    let inputs_count = input_vstreams.len();  // Number of input streams
-    let outputs_count = output_vstreams.len(); // Number of output streams
-    let frames_count = 1;  // Set the number of frames for inference
-
-    // Run inference
-    if let Err(e) = run_inference(
-        network_group,
-        inputs_params,
-        input_buffers,
-        inputs_count,
-        outputs_params,
-        output_buffers,
-        outputs_count,
-        frames_count,
-    ) {
-        eprintln!("Inference failed: {}", e);
-    }
-    // Release VDevice
-    if let Err(e) = release_vdevice(vdevice) {
-        eprintln!("Error releasing VDevice: {}", e);
     }
 }
