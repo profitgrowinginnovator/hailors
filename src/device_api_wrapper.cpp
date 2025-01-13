@@ -117,7 +117,8 @@ extern "C" hailo_status hailors_load_hef(const char *hef_path, hailo_network_gro
         return HAILO_NOT_FOUND;
     }
 
-    *network_group = network_groups_result->at(0).get();
+    static std::shared_ptr<hailort::ConfiguredNetworkGroup> stored_network_group = network_groups_result->at(0);
+    *network_group = stored_network_group.get();
     return HAILO_SUCCESS;
 }
 

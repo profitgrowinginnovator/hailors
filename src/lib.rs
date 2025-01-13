@@ -1,6 +1,7 @@
 mod status;
 
 use autocxx::prelude::*;
+use std::mem::MaybeUninit;
 use std::ptr;
 use std::ffi::CString;
 use status::HailoStatus;
@@ -16,7 +17,9 @@ include_cpp! {
     generate!("hailors_release_vdevice")
     generate!("hailors_scan_devices")
     generate!("hailors_create_input_vstreams")
+
     generate!("hailors_create_output_vstreams")
+
     generate!("hailo_status")
     generate!("hailo_get_input_stream_info")
     generate!("hailo_get_output_stream_info")
@@ -177,6 +180,21 @@ pub struct HailoOutputVstreamParamsByName {
 extern "C" {
     fn get_input_stream_info(stream: *mut c_void, info: *mut HailoStreamInfo) -> i32;
     fn get_output_stream_info(stream: *mut c_void, info: *mut HailoStreamInfo) -> i32;
+    fn hailors_create_input_vstreams(
+        network_group: *mut c_void,
+        input_params: *const HailoInputVstreamParamsByName,  // Manual struct
+        input_params_count: usize,
+        input_vstreams: *mut *mut c_void,
+        input_count: *mut usize,
+    ) -> i32;
+
+    fn hailors_create_output_vstreams(
+        network_group: *mut c_void,
+        output_params: *const HailoOutputVstreamParamsByName,  // Manual struct
+        output_params_count: usize,
+        output_vstreams: *mut *mut c_void,
+        output_count: *mut usize,
+    ) -> i32;
 }
 
 pub fn fetch_input_stream_info(stream: *mut c_void) -> Result<HailoStreamInfo, String> {
@@ -297,38 +315,80 @@ pub fn create_vstreams(
     let mut input_stream_infos: Vec<HailoStreamInfo> = Vec::with_capacity(max_params_count);
     let mut output_stream_infos: Vec<HailoStreamInfo> = Vec::with_capacity(max_params_count);
 
-    // Query input streams from network group
-    let mut input_count: usize = max_params_count;
+    // Query input stream info dynamically
+    let input_stream_infos = get_network_input_stream_infos(network_group)?;
+
+    let mut input_params: Vec<HailoInputVstreamParamsByName> = input_stream_infos
+    .iter()
+    .map(|info| {
+        let mut name_buf = [0u8; 64];
+        let stream_name = info.get_name();
+        name_buf[..stream_name.len()].copy_from_slice(stream_name.as_bytes());
+
+        HailoInputVstreamParamsByName {
+            name: name_buf,
+            params: HailoVstreamParams {
+                user_buffer_format: format_type as i32,
+                timeout_ms: 5000,
+                queue_size: 16,
+                vstream_stats_flags: 0,
+                pipeline_elements_stats_flags: 0,
+            },
+        }
+    })
+    .collect();
+
+    let mut input_count: usize = input_params.len();  // Initialize with the number of input params
+
+
+    // Call the C function directly using the manual FFI types:
     let status = unsafe {
-        ffi::hailors_create_input_vstreams(
-            network_group as *mut c_void,  
-            std::ptr::null_mut(),
-            0,
+        hailors_create_input_vstreams(
+            network_group as *mut c_void,
+            input_params.as_mut_ptr(),
+            input_params.len(),
             input_vstreams.as_mut_ptr() as *mut *mut c_void,
             &mut input_count,
         )
     };
+
     if HailoStatus::from_i32(status as i32) != HailoStatus::Success {
         return Err("Failed to create input vstreams from network group".to_string());
     }
 
     // Fetch input stream info using `fetch_stream_info`
-    for &input_vstream in input_vstreams.iter().take(input_count) {
-        match fetch_input_stream_info(input_vstream as *mut c_void) {
-            Ok(info) => input_stream_infos.push(info),
-            Err(e) => return Err(format!("Failed to get input stream info: {}", e)),
+    let output_stream_infos = get_network_output_stream_infos(network_group)?;
+
+    let output_params: Vec<HailoOutputVstreamParamsByName> = output_stream_infos
+    .iter()
+    .map(|info| {
+        let mut name_buf = [0u8; 64];
+        let stream_name = info.get_name();
+        name_buf[..stream_name.len()].copy_from_slice(stream_name.as_bytes());
+
+        HailoOutputVstreamParamsByName {
+            name: name_buf,
+            params: HailoVstreamParams {
+                user_buffer_format: format_type as i32,
+                timeout_ms: 5000,
+                queue_size: 16,
+                vstream_stats_flags: 0,
+                pipeline_elements_stats_flags: 0,
+            },
         }
-    }
+    })
+    .collect();
 
     // Query output streams from network group
-    let mut output_count: usize = max_params_count;
+    let mut output_count: usize = output_params.len();  // Requesting to create this many output streams
+
     let status = unsafe {
-        ffi::hailors_create_output_vstreams(
-            network_group as *mut c_void,  
-            std::ptr::null_mut(),
-            0,
+        hailors_create_output_vstreams(
+            network_group as *mut c_void,
+            output_params.as_ptr(),
+            output_params.len(),  // Pass the number of params you provide
             output_vstreams.as_mut_ptr() as *mut *mut c_void,
-            &mut output_count,
+            &mut output_count,    // The function will overwrite this with the actual number created
         )
     };
     if HailoStatus::from_i32(status as i32) != HailoStatus::Success {
