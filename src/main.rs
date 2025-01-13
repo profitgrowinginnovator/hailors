@@ -94,7 +94,7 @@ fn main() {
         let format_type = HailoFormatType::UINT8;
 
         // Create input and output vstreams
-        let (input_buffers, output_buffers) = match create_vstreams(network_group, format_type, max_params_count, None) {
+        let (input_buffers, output_buffers) = match create_vstreams(network_group, format_type, Some(max_params_count)) {
             Ok((input, output)) => (input, output),
             Err(e) => {
                 eprintln!("Error creating vstreams: {}", e);

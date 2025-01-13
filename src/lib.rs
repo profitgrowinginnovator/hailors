@@ -25,9 +25,11 @@ include_cpp! {
     generate!("get_input_stream_info")
     generate!("get_output_stream_info")
     generate!("get_stream_name")
-    generate!("get_stream_info")
 
 }
+
+
+
 
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -77,6 +79,7 @@ impl std::fmt::Debug for HailoStreamShapeUnion {
     }
 }
 
+
 #[repr(C)]
 pub struct HailoStreamInfo {
     pub shape_union: HailoStreamShapeUnion,
@@ -88,6 +91,13 @@ pub struct HailoStreamInfo {
     pub name: [u8; HAILO_MAX_STREAM_NAME_SIZE],
     pub quant_info: HailoQuantInfo,
     pub is_mux: bool,
+}
+
+impl HailoStreamInfo {
+    pub fn get_name(&self) -> String {
+        let c_str = unsafe { std::ffi::CStr::from_ptr(self.name.as_ptr() as *const u8) };
+        c_str.to_str().unwrap_or("invalid").to_string()
+    }
 }
 
 #[repr(C)]
@@ -164,6 +174,33 @@ pub struct HailoOutputVstreamParamsByName {
 }
 
 
+extern "C" {
+    fn get_input_stream_info(stream: *mut c_void, info: *mut HailoStreamInfo) -> i32;
+    fn get_output_stream_info(stream: *mut c_void, info: *mut HailoStreamInfo) -> i32;
+}
+
+pub fn fetch_input_stream_info(stream: *mut c_void) -> Result<HailoStreamInfo, String> {
+    let mut info: HailoStreamInfo = unsafe { std::mem::zeroed() };
+    let status = unsafe { get_input_stream_info(stream, &mut info) };
+
+    if status == 0 {
+        Ok(info)
+    } else {
+        Err("Failed to get input stream info".to_string())
+    }
+}
+
+pub fn fetch_output_stream_info(stream: *mut c_void) -> Result<HailoStreamInfo, String> {
+    let mut info: HailoStreamInfo = unsafe { std::mem::zeroed() };
+    let status = unsafe { get_output_stream_info(stream, &mut info) };
+
+    if status == 0 {
+        Ok(info)
+    } else {
+        Err("Failed to get output stream info".to_string())
+    }
+}
+
 pub fn scan_devices() -> Result<Vec<String>, String> {
     const MAX_DEVICES: usize = 32;
     let mut device_ids: [u8; 64 * MAX_DEVICES] = [0; 64 * MAX_DEVICES];
@@ -230,11 +267,16 @@ pub fn release_vdevice(vdevice_handle: *mut c_void) -> Result<(), String> {
     }
 }
 
-pub fn load_hef(hef_path: &str, vdevice_handle: *mut c_void) -> Result<*mut c_void, String> {
+pub fn load_hef(hef_path: &str, vdevice_handle: *mut c_void) -> Result<*mut ffi::hailo_configured_network_group, String> {
     let c_hef_path = CString::new(hef_path).map_err(|_| "Invalid HEF path".to_string())?;
-    let mut network_group_handle: *mut c_void = std::ptr::null_mut();
+    let mut network_group_handle: *mut ffi::hailo_configured_network_group = std::ptr::null_mut();
 
-    let status = unsafe { ffi::hailors_load_hef(c_hef_path.as_ptr(), &mut network_group_handle, vdevice_handle as *mut _) };
+    let status = unsafe { 
+        ffi::hailors_load_hef(
+            c_hef_path.as_ptr(), 
+            &mut network_group_handle as *mut _ as *mut *mut c_void,  
+            vdevice_handle as *mut _) 
+        };
     let hailo_status = HailoStatus::from_i32(status as i32);
     if hailo_status == HailoStatus::Success {
         Ok(network_group_handle)
@@ -249,71 +291,81 @@ pub fn create_vstreams(
 ) -> Result<(Vec<Vec<u8>>, Vec<Vec<u8>>), String> {
     let max_params_count = max_params_count.unwrap_or(16);
 
+    // Initialize vectors for streams and stream info
     let mut input_vstreams: Vec<*mut ffi::hailo_input_stream> = vec![std::ptr::null_mut(); max_params_count];
     let mut output_vstreams: Vec<*mut ffi::hailo_output_stream> = vec![std::ptr::null_mut(); max_params_count];
+    let mut input_stream_infos: Vec<HailoStreamInfo> = Vec::with_capacity(max_params_count);
+    let mut output_stream_infos: Vec<HailoStreamInfo> = Vec::with_capacity(max_params_count);
 
-    let mut input_stream_infos: Vec<std::mem::MaybeUninit<ffi::hailo_stream_info_t>> = Vec::with_capacity(max_params_count);
-    let mut output_stream_infos: Vec<std::mem::MaybeUninit<ffi::hailo_stream_info_t>> = Vec::with_capacity(max_params_count);
-    
-    // Initialize the memory
-    for _ in 0..max_params_count {
-        input_stream_infos.push(std::mem::MaybeUninit::zeroed());
-        output_stream_infos.push(std::mem::MaybeUninit::zeroed());
+    // Query input streams from network group
+    let mut input_count: usize = max_params_count;
+    let status = unsafe {
+        ffi::hailors_create_input_vstreams(
+            network_group as *mut c_void,  
+            std::ptr::null_mut(),
+            0,
+            input_vstreams.as_mut_ptr() as *mut *mut c_void,
+            &mut input_count,
+        )
+    };
+    if HailoStatus::from_i32(status as i32) != HailoStatus::Success {
+        return Err("Failed to create input vstreams from network group".to_string());
     }
-    
-    // Convert `MaybeUninit` to initialized values
-    let mut input_stream_infos: Vec<ffi::hailo_stream_info_t> = unsafe { std::mem::transmute(input_stream_infos) };
-    let mut output_stream_infos: Vec<ffi::hailo_stream_info_t> = unsafe { std::mem::transmute(output_stream_infos) };
-    
-    // Query input stream info
-    for i in 0..max_params_count {
-        let status = unsafe {
-            ffi::get_stream_info(input_vstreams[i], &mut input_stream_infos[i])
-        };
-        if HailoStatus::from_i32(status as i32) != HailoStatus::Success {
-            return Err(format!("Failed to get input stream info for stream {}", i));
+
+    // Fetch input stream info using `fetch_stream_info`
+    for &input_vstream in input_vstreams.iter().take(input_count) {
+        match fetch_input_stream_info(input_vstream as *mut c_void) {
+            Ok(info) => input_stream_infos.push(info),
+            Err(e) => return Err(format!("Failed to get input stream info: {}", e)),
         }
     }
 
-    // Extract stream names
-    for info in &input_stream_infos {
-        let stream_name = unsafe {
-            let name_ptr = ffi::get_stream_name(info);
-            if name_ptr.is_null() {
-                "unknown".to_string()
-            } else {
-                std::ffi::CStr::from_ptr(name_ptr).to_str().unwrap_or("unknown").to_string()
-            }
-        };
-        println!("Input stream name: {}", stream_name);
+    // Query output streams from network group
+    let mut output_count: usize = max_params_count;
+    let status = unsafe {
+        ffi::hailors_create_output_vstreams(
+            network_group as *mut c_void,  
+            std::ptr::null_mut(),
+            0,
+            output_vstreams.as_mut_ptr() as *mut *mut c_void,
+            &mut output_count,
+        )
+    };
+    if HailoStatus::from_i32(status as i32) != HailoStatus::Success {
+        return Err("Failed to create output vstreams from network group".to_string());
     }
 
-    // Query output stream info
-    for i in 0..max_params_count {
-        let status = unsafe {
-            ffi::get_stream_info(output_vstreams[i] as *mut ffi::hailo_input_stream, &mut output_stream_infos[i])
-        };
-        if HailoStatus::from_i32(status as i32) != HailoStatus::Success {
-            return Err(format!("Failed to get output stream info for stream {}", i));
+    // Fetch output stream info using `fetch_stream_info`
+    for &output_vstream in output_vstreams.iter().take(output_count) {
+        match fetch_output_stream_info(output_vstream as *mut c_void) {
+            Ok(info) => output_stream_infos.push(info),
+            Err(e) => return Err(format!("Failed to get output stream info: {}", e)),
         }
     }
 
-    // Create input and output buffers
-    let input_buffers = vec![vec![0u8; 4096]; max_params_count];
-    let output_buffers = vec![vec![0u8; 4096]; max_params_count];
+    // Create input and output buffers with appropriate sizes
+    let input_buffers: Vec<Vec<u8>> = input_stream_infos
+    .iter()
+    .map(|info| vec![0u8; info.hw_data_bytes as usize])
+    .collect();
+    let output_buffers: Vec<Vec<u8>> = output_stream_infos
+    .iter()
+    .map(|info| vec![0u8; info.hw_data_bytes as usize])
+    .collect();
 
     Ok((input_buffers, output_buffers))
+
 }
 
 
 pub fn run_inference(
-    network_group: *mut c_void,
+    network_group: *mut ffi::hailo_configured_network_group,
     inference_buffers: &InferenceBuffers,
     frames_count: usize,
 ) -> Result<(), String> {
     let status = unsafe {
         hailors_infer(
-            network_group,
+            network_group as *mut c_void,
             ptr::null_mut(),
             inference_buffers.input_buffers_ptrs.as_ptr() as *mut c_void,
             inference_buffers.input_buffers_ptrs.len(),

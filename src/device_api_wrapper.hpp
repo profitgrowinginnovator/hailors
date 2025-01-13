@@ -8,6 +8,7 @@ extern "C" {
     typedef void* hailo_vdevice_handle;
     typedef void* hailo_network_group_handle;
     typedef void* hailo_vstream_handle;
+
     hailo_status hailors_open_device(const char *device_id, hailo_device_handle *device);
     hailo_status hailors_close_device(hailo_device_handle device);
     hailo_status hailors_vdevice_create(hailo_vdevice_handle *vdevice);
@@ -43,5 +44,7 @@ extern "C" {
     const char* get_stream_name(const hailo_stream_info_t *info);
     hailo_status get_input_stream_info(hailo_input_stream *stream, hailo_stream_info_t *info);
     hailo_status get_output_stream_info(hailo_output_stream *stream, hailo_stream_info_t *info);
-}   hailo_status get_stream_info(hailo_input_stream *stream, hailo_stream_info_t *info);
+    hailo_status get_stream_info(hailo_input_stream *stream, hailo_stream_info_t *info);
+
+}   
 #endif // DEVICE_API_WRAPPER_HPP

@@ -6,6 +6,7 @@
 #include <memory>
 #include <iostream>
 
+
 extern "C" hailo_status hailors_open_device(const char *device_id, hailo_device_handle *device) {
     if (!device_id || !device) {
         return HAILO_INVALID_ARGUMENT;
@@ -75,6 +76,15 @@ extern "C" const char* get_stream_name(const hailo_stream_info_t *info) {
         return nullptr;
     }
     return info->name;
+}
+
+
+
+extern "C" hailo_status get_stream_info(hailo_input_stream *stream, hailo_stream_info_t *info) {
+    if (!stream || !info) {
+        return HAILO_INVALID_ARGUMENT;
+    }
+    return hailo_get_input_stream_info(*stream, info);
 }
 
 extern "C" hailo_status hailors_load_hef(const char *hef_path, hailo_network_group_handle *network_group, hailo_vdevice_handle optional_vdevice) {
