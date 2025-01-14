@@ -1,4 +1,5 @@
-#[derive(PartialEq, Debug)]
+#[repr(C)]
+#[derive(Debug, Clone, Copy, PartialEq)] 
 pub enum HailoStatus {
     Success = 0,  // No error
     Uninitialized = 1,  // No error code initialized
@@ -88,3 +89,6 @@ impl std::fmt::Display for HailoStatus {
         }
     }
 }
+
+
+     
