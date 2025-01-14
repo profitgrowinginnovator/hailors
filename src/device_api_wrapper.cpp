@@ -1,151 +1,150 @@
 #include "device_api_wrapper.hpp"
-#include "hailort.h"
-#include <cstring>
-#include <iomanip>
+#include <vector>
+#include <thread>
+#include <iostream>
 
 using namespace hailort;
 
-#define MAX_DEVICES 32
-
-extern "C" hailo_status hailors_infer(
-    hailo_network_group_handle network_group,
-    hailo_input_vstream_params_by_name_t *input_params,
-    hailo_stream_raw_buffer_by_name_t *input_buffers,
-    size_t inputs_count,
-    hailo_output_vstream_params_by_name_t *output_params,
-    hailo_stream_raw_buffer_by_name_t *output_buffers,
-    size_t outputs_count,
-    size_t frames_count)
-{
-    auto *configured_group = reinterpret_cast<hailo_configured_network_group *>(network_group);
-    if (!configured_group) {
-        return HAILO_INVALID_ARGUMENT;  // Handle null pointer case
+extern "C" hailo_status hailors_create_vdevice(hailo_vdevice_handle* vdevice) {
+    auto vdevice_result = VDevice::create();
+    if (!vdevice_result) {
+        return vdevice_result.status();
     }
-
-    // Call the Hailo `hailo_infer` function
-    hailo_status status = hailo_infer(
-        *configured_group,
-        input_params, input_buffers, inputs_count,
-        output_params, output_buffers, outputs_count,
-        frames_count);
-
-    return status;  // Return the status
-}
-
-extern "C" hailo_status hailors_vdevice_create(hailo_vdevice_handle *vdevice) {
-    auto vdev = VDevice::create();
-    if (!vdev) return vdev.status();
-    *vdevice = vdev.value().release();  // Release ownership of the device
+    *vdevice = vdevice_result.value().release();  // Store as raw pointer
     return HAILO_SUCCESS;
 }
-
-extern "C" hailo_status hailors_load_hef(const char *hef_path, hailo_network_group_handle *network_group) {
-    auto hef = Hef::create(hef_path);
-    if (!hef) {
-        return hef.status();  // Return the error status if HEF creation fails
-    }
-
-    auto vdevice = VDevice::create();
-    if (!vdevice) {
-        return vdevice.status();  // Return the error status if VDevice creation fails
-    }
-
-    auto network_groups = vdevice.value()->configure(hef.value());
-    if (!network_groups) {
-        return network_groups.status();  // Return the error status if network group configuration fails
-    }
-
-    if (network_groups->empty()) {
-        return HAILO_NOT_FOUND;  // Handle the case where no network groups are returned
-    }
-
-    // Pass the raw pointer to the single-level `network_group`
-    *network_group = network_groups->at(0).get();  // Obtain the raw pointer from shared_ptr
-    return HAILO_SUCCESS;
-}
-
-extern "C" hailo_status hailors_create_vstreams(
-hailo_network_group_handle network_group,
-    hailo_input_vstream_params_by_name_t *input_params,
-    size_t input_params_count,
-    hailo_output_vstream_params_by_name_t *output_params,
-    size_t output_params_count,
-    hailo_vstream_handle *input_vstreams,
-    size_t *input_count,
-    hailo_vstream_handle *output_vstreams,
-    size_t *output_count)
-{
-    auto *configured_group = reinterpret_cast<hailo_configured_network_group*>(network_group);
-    if (!configured_group) {
-        return HAILO_INVALID_ARGUMENT;  // Handle null pointer case
-    }
-
-    hailo_status status = hailo_create_input_vstreams(
-        *configured_group,
-        input_params,
-        input_params_count,
-        reinterpret_cast<hailo_input_vstream*>(input_vstreams));
-    if (HAILO_SUCCESS != status) {
-        return status;
-    }
-
-    status = hailo_create_output_vstreams(
-        *configured_group,
-        output_params,
-        output_params_count,
-        reinterpret_cast<hailo_output_vstream*>(output_vstreams));
-    if (HAILO_SUCCESS != status) {
-        hailo_release_input_vstreams(reinterpret_cast<hailo_input_vstream*>(input_vstreams), input_params_count);
-        return status;
-    }
-
-    *input_count = input_params_count;
-    *output_count = output_params_count;
-
-    return HAILO_SUCCESS;
-}
-
-extern "C" hailo_status hailors_close_device(hailo_device_handle device) {
-    delete static_cast<Device*>(device);  // Safely delete
-    return HAILO_SUCCESS;
-}
-
-extern "C" hailo_status hailors_scan_devices(hailo_device_id_t *device_ids, size_t *device_count) {
-    if (!device_ids || !device_count) {
-        return HAILO_INVALID_ARGUMENT;  // Handle null pointers
-    }
-
-    // Call the Hailo API function directly with the default parameters
-    hailo_status status = hailo_scan_devices(nullptr, device_ids, device_count);
-    if (status != HAILO_SUCCESS) {
-        *device_count = 0;  // No devices found or an error occurred
-        return status;
-    }
-
-    return HAILO_SUCCESS;  // Successfully scanned devices
-}
-
-
-
 
 extern "C" hailo_status hailors_release_vdevice(hailo_vdevice_handle vdevice) {
-    if (!vdevice) {
-        return HAILO_INVALID_ARGUMENT;  // Handle null pointer case
-    }
-    delete static_cast<VDevice *>(vdevice);  // Release the VDevice instance
+    delete static_cast<VDevice*>(vdevice);
     return HAILO_SUCCESS;
 }
 
-extern "C" hailo_status hailors_open_device(const char *device_id, hailo_device_handle *device) {
-    if (!device_id || !device) {
-        return HAILO_INVALID_ARGUMENT;  // Handle null pointers
+extern "C" hailo_status hailors_configure_hef(
+    hailo_vdevice_handle vdevice,
+    const char* hef_path,
+    hailo_network_group_handle* network_group,
+    hailo_input_vstream_handle* input_vstreams,
+    size_t* input_count,
+    hailo_output_vstream_handle* output_vstreams,
+    size_t* output_count) {
+
+    auto vdevice_ptr = static_cast<VDevice*>(vdevice);
+    auto hef_result = Hef::create(hef_path);
+    if (!hef_result) {
+        return hef_result.status();
+    }
+    auto hef = std::move(hef_result.value());  // Move instead of copy
+
+    auto configure_params = vdevice_ptr->create_configure_params(hef);
+    if (!configure_params) {
+        return configure_params.status();
     }
 
-    auto device_result = Device::create(device_id);
-    if (!device_result) {
-        return device_result.status();  // Return error status if creation fails
+    auto network_groups_result = vdevice_ptr->configure(hef, configure_params.value());
+    if (!network_groups_result || network_groups_result->empty()) {
+        return network_groups_result.status();
     }
 
-    *device = device_result.value().release();  // Release ownership to the caller
+    // Access the first network group
+    auto configured_network_group = network_groups_result.value()[0];
+    if (!configured_network_group) {
+        std::cerr << "Failed to get network group from vector." << std::endl;
+        return HAILO_INVALID_OPERATION;
+    }
+
+    // Create input vstreams
+    auto input_vstream_params = configured_network_group->make_input_vstream_params(false, HAILO_FORMAT_TYPE_AUTO, HAILO_DEFAULT_VSTREAM_TIMEOUT_MS, HAILO_DEFAULT_VSTREAM_QUEUE_SIZE, "");
+    if (!input_vstream_params) {
+        return input_vstream_params.status();
+    }
+    auto input_streams_result = VStreamsBuilder::create_input_vstreams(*configured_network_group, input_vstream_params.value());
+    if (!input_streams_result) {
+        return input_streams_result.status();
+    }
+    auto input_streams = std::move(input_streams_result.value());
+    *input_count = input_streams.size();
+    for (size_t i = 0; i < *input_count; ++i) {
+        input_vstreams[i] = new InputVStream(std::move(input_streams[i]));  // Move instead of copy
+    }
+
+    // Create output vstreams
+    auto output_vstream_params = configured_network_group->make_output_vstream_params(false, HAILO_FORMAT_TYPE_FLOAT32, HAILO_DEFAULT_VSTREAM_TIMEOUT_MS, HAILO_DEFAULT_VSTREAM_QUEUE_SIZE, "");
+    if (!output_vstream_params) {
+        return output_vstream_params.status();
+    }
+    auto output_streams_result = VStreamsBuilder::create_output_vstreams(*configured_network_group, output_vstream_params.value());
+    if (!output_streams_result) {
+        return output_streams_result.status();
+    }
+    auto output_streams = std::move(output_streams_result.value());
+    *output_count = output_streams.size();
+    for (size_t i = 0; i < *output_count; ++i) {
+        output_vstreams[i] = new OutputVStream(std::move(output_streams[i]));  // Move instead of copy
+    }
+
+    // Set the network group handle
+    *network_group = configured_network_group.get();
+
     return HAILO_SUCCESS;
+}
+
+extern "C" hailo_status hailors_infer(hailo_network_group_handle network_group, void **input_vstreams, size_t input_count, void **output_vstreams, size_t output_count)
+{
+    if (!network_group || !input_vstreams || !output_vstreams) {
+        return HAILO_INVALID_ARGUMENT;
+    }
+
+    hailo_status status = HAILO_SUCCESS;  // Default to success
+
+    // Create input threads
+    std::vector<std::thread> input_threads;
+    for (size_t i = 0; i < input_count; ++i) {
+        input_threads.emplace_back([&status, input_vstreams, i]() {
+            auto *input_stream = static_cast<InputVStream*>(input_vstreams[i]);
+            std::vector<uint8_t> data(input_stream->get_frame_size(), 0);
+            for (size_t j = 0; j < 100; ++j) {
+                hailo_status write_status = input_stream->write(MemoryView(data.data(), data.size()));
+                if (write_status != HAILO_SUCCESS) {
+                    status = write_status;  // Return the actual error status
+                    return;
+                }
+            }
+            hailo_status flush_status = input_stream->flush();
+            if (flush_status != HAILO_SUCCESS) {
+                status = flush_status;  // Return the flush failure status if applicable
+            }
+        });
+    }
+
+    // Create output threads
+    std::vector<std::thread> output_threads;
+    for (size_t i = 0; i < output_count; ++i) {
+        output_threads.emplace_back([&status, output_vstreams, i]() {
+            auto *output_stream = static_cast<OutputVStream*>(output_vstreams[i]);
+            std::vector<uint8_t> data(output_stream->get_frame_size());
+            for (size_t j = 0; j < 100; ++j) {
+                hailo_status read_status = output_stream->read(MemoryView(data.data(), data.size()));
+                if (read_status != HAILO_SUCCESS) {
+                    status = read_status;  // Return the actual read error status
+                    return;
+                }
+            }
+        });
+    }
+
+    // Join all threads
+    for (auto &t : input_threads) {
+        t.join();
+    }
+    for (auto &t : output_threads) {
+        t.join();
+    }
+
+    if (status == HAILO_SUCCESS) {
+        std::cout << "Inference completed successfully." << std::endl;
+    } else {
+        std::cerr << "Inference failed with status: " << status << std::endl;
+    }
+
+    return status;
 }
