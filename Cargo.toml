@@ -2,7 +2,17 @@
 name = "hailors"
 version = "0.1.0"
 edition = "2021"
+authors = ["Maarten Ectors <maarten@profitgrowinginnovator.com>"] 
+description = "A Rust crate for interfacing with Hailo hardware using FFI bindings."
+homepage = "https://github.com/profitgrowinginnovator/hailors" 
+repository = "https://github.com/profitgrowinginnovator/hailors" 
+documentation = "https://docs.rs/hailors" # for online documentation
+license = "MIT"
+keywords = ["FFI", "Hailo", "hardware", "bindings", "Rust", "C++"]
+categories = ["embedded", "hardware-support", "scientific-computing"]
 build = "build.rs"
+readme = "README.md" # include the readme for crates.io
+exclude = ["tests/", "hef/*"] 
 
 [dependencies]
 autocxx = { version = "0.27.1", optional = true }
@@ -28,10 +38,8 @@ test-linking = ["autocxx"]
 #incremental = false
 debug = true
 
-#[profile.release]
-#lto = true
-#codegen-units = 1
-
+[package.metadata.docs.rs]
+all-features = true
 
 [lib]
 crate-type = ["rlib", "cdylib"]
