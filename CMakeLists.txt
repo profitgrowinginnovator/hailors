@@ -1,18 +1,28 @@
-cmake_minimum_required(VERSION 3.10)
+cmake_minimum_required(VERSION 3.14)
 project(hailors)
 
+# Set C++ standard
 set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_CXX_FLAGS "-Wall -Werror")
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-add_library(hailo_lib STATIC src/device_api_wrapper.cpp)
-
-# HailoRT include and library paths
-find_library(HAILO_LIB hailort PATHS /usr/local/lib /usr/lib REQUIRED)
+# Include the Hailo header files
 include_directories("/usr/include/hailo")
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src)
 
-target_link_libraries(hailo_lib PRIVATE ${HAILO_LIB})
+# Add the source files
+add_library(hailors SHARED 
+    src/device_api_wrapper.cpp
+    src/custom_wrapper.cpp  # Add this line for your new wrapper
+)
 
-add_executable(test_device_api_wrapper test/test_device_api_wrapper.cpp)
-find_package(GTest REQUIRED)
+# Link against the required Hailo runtime library
+target_link_libraries(hailors hailort)
 
-target_link_libraries(test_device_api_wrapper PRIVATE hailo_lib GTest::GTest GTest::Main pthread)
+# Include directory for Rust's FFI generation
+target_include_directories(hailors PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
+
+# Ensure that the output is placed correctly for Rust bindings
+set_target_properties(hailors PROPERTIES
+    LIBRARY_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/../"
+)
+

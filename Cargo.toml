@@ -32,11 +32,6 @@ debug = true
 #codegen-units = 1
 
 
-
-[[bin]]
-name = "main"
-path = "src/main.rs"
-
 [lib]
 #crate-type = ["bin"]
 #crate-type = ["staticlib"]

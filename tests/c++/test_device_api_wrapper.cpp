@@ -1,5 +1,5 @@
 #include <gtest/gtest.h>
-#include "../src/device_api_wrapper.hpp"
+#include "../../src/device_api_wrapper.hpp"
 
 class HailoTestSuite : public ::testing::Test {
 protected:

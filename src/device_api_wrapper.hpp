@@ -3,6 +3,7 @@
 
 #include "hailo/hailort.hpp"
 
+
 extern "C" {
 
 // Handle typedefs
