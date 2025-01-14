@@ -1,10 +1,11 @@
 // Include the necessary imports and macros.
-mod status;
+pub mod status;
 
-use status::HailoStatus;
-use autocxx::prelude::*;
+pub use status::HailoStatus;
+pub use autocxx::prelude::*;
 use std::ffi::CString;
 use std::ptr;
+
 
 
 
