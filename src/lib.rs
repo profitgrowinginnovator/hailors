@@ -6,6 +6,8 @@ use autocxx::prelude::*;
 use std::ffi::CString;
 use std::ptr;
 
+
+
 include_cpp! {
     #include "custom_wrapper.hpp"
     #include "device_api_wrapper.hpp"
@@ -119,3 +121,5 @@ impl Drop for HailoDevice {
         }
     }
 }
+
+

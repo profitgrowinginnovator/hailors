@@ -1,6 +1,8 @@
+
+
 #[cfg(test)]
 mod tests {
-    use hailors::{InputVStream, OutputVStream, HailoDevice};
+    use hailors::*;
 
     #[test]
     fn test_device_creation_and_release() {

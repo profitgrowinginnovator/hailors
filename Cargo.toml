@@ -2,7 +2,7 @@
 name = "hailors"
 version = "0.1.0"
 edition = "2021"
-#build = "build.rs"
+build = "build.rs"
 
 [dependencies]
 autocxx = { version = "0.27.1", optional = true }
@@ -19,6 +19,7 @@ cc = "1.2.7"
 
 [features]
 default = ["autocxx"]
+test-linking = ["autocxx"]
 
 #[package.metadata]
 #include = ["src/lib.rs", "build.rs"]
@@ -33,7 +34,8 @@ debug = true
 
 
 [lib]
-#crate-type = ["bin"]
-#crate-type = ["staticlib"]
+crate-type = ["rlib", "cdylib"]
 name = "hailors"
 path = "src/lib.rs"
+
+
