@@ -1,0 +1,2 @@
+net_name,status,status_description,fps,num_of_frames,send_rate,recv_rate,hw_latency,overall_latency,min_power,average_power,max_power,min_current,average_current,max_current,min_temp,average_temp,max_temp
+yolov8s,0,HAILO_SUCCESS,291.833,1462,2868.83,2850.9,,,,,,,,,,,

@@ -46,30 +46,43 @@ hailo_vdevice_handle HailoTestSuite::vdevice_handle = nullptr;
 
 
 struct Detection {
-    int class_id;
+    float x1;        // Top-left X coordinate
+    float y1;        // Top-left Y coordinate
+    float x2;        // Bottom-right X coordinate
+    float y2;        // Bottom-right Y coordinate
     float confidence;
-    std::vector<float> bbox;  // Bounding box (x_min, y_min, x_max, y_max)
-
-    // Constructor for easy initialization
-    Detection(int class_id, float confidence, const std::vector<float>& bbox)
-        : class_id(class_id), confidence(confidence), bbox(bbox) {}
+    int class_id;
 };
 
 
-std::vector<Detection> parse_detections(const std::vector<float>& output_data, float threshold = 0.5f) {
-    std::vector<Detection> detections;
+// Function to parse detections
+std::vector<Detection> parse_detections(const std::vector<float> &output_data, float threshold = 0.5f) {
+    std::vector<Detection> parsed_detections;
 
-    for (size_t i = 0; i < output_data.size(); i += 6) {
-        int class_id = static_cast<int>(output_data[i]);
-        float confidence = output_data[i + 1];
+    size_t index = 0;
+    size_t num_classes = 80; // number of classes
+    size_t max_bboxes_per_class = 100; // max bboxes per class
 
-        if (confidence >= threshold) {
-            std::vector<float> bbox = { output_data[i + 2], output_data[i + 3], output_data[i + 4], output_data[i + 5] };
-            detections.push_back({class_id, confidence, bbox});
+    for (size_t class_id = 0; class_id < num_classes; class_id++) {
+        size_t bbox_count = static_cast<size_t>(output_data[index++]); // Number of bboxes for this class
+
+        // Iterate over bounding boxes for the current class
+        for (size_t i = 0; i < bbox_count; i++) {
+            float x1 = output_data[index++];
+            float y1 = output_data[index++];
+            float x2 = output_data[index++];
+            float y2 = output_data[index++];
+            float confidence = output_data[index++];
+
+            // Filter detections based on confidence threshold
+            if (confidence >= threshold) {
+                Detection detection = {x1, y1, x2, y2, confidence, static_cast<int>(class_id)};
+                parsed_detections.push_back(detection);
+            }
         }
     }
 
-    return detections;
+    return parsed_detections;
 }
 
 
@@ -144,21 +157,39 @@ void normalize_rgb_to_nrgb(const std::string& input_filename, const std::string&
     std::cout << "Successfully normalized and wrote image to " << output_filename << std::endl;
 }
 
-void write_output_to_file(const std::vector<float>& output_data, const std::string& filename) {
-    std::ofstream output_file(filename, std::ios::binary);
+void write_output_to_file(const std::vector<float>& output_data, const std::string& filename, size_t per_line) {
+    // Open the output file in text mode for CSV format
+    std::ofstream output_file(filename, std::ios::out);
     if (!output_file) {
         std::cerr << "Failed to open file for writing: " << filename << std::endl;
         return;
     }
 
-    // Write the size of the vector first (so we can read it back later)
-    size_t size = output_data.size();
-    output_file.write(reinterpret_cast<const char*>(&size), sizeof(size));
+    // Write the output data to the CSV file
+    size_t count = 0;
+    for (const auto& value : output_data) {
+        // Write the value to the file
+        output_file << value;
 
-    // Write the actual data
-    output_file.write(reinterpret_cast<const char*>(output_data.data()), size * sizeof(float));
+        // Increment the count
+        count++;
 
-    std::cout << "Successfully wrote " << size << " values to " << filename << std::endl;
+        // Add a comma if it's not the last value in the row
+        if (count % per_line != 0 && count != output_data.size()) {
+            output_file << ",";
+        }
+        // If we've written `per_line` values, go to the next line
+        else if (count % per_line == 0) {
+            output_file << "\n";
+        }
+    }
+
+    // If the last line isn't completely filled, ensure we don't add an extra newline
+    if (count % per_line != 0) {
+        output_file << "\n";
+    }
+
+    std::cout << "Successfully wrote " << output_data.size() << " values to " << filename << std::endl;
 }
 
 TEST_F(HailoTestSuite, CreateAndReleaseVDevice) {
@@ -227,46 +258,13 @@ TEST_F(HailoTestSuite, PerformInference) {
 
     ASSERT_EQ(status, HAILO_SUCCESS);
 
-    auto detections = parse_detections(output_data, 0.5F);
+    //write_output_to_file(output_data, "output.csv", 6);
 
-    for (size_t i = 0; i < output_data.size(); i += 6) {  // Each detection is 6 floats: class_id, confidence, x_min, y_min, x_max, y_max
-        int class_id = static_cast<int>(output_data[i]);      // Class ID
-        float confidence = output_data[i + 1];
-        
-        // Print out the detected class ID and confidence
-        //std::cout << "Class ID: " << class_id << ", Confidence: " << confidence << std::endl;
+    auto detections = parse_detections(output_data, 0.85F);
 
-        // Make sure that class_id is in range (if it's outside, ignore it)
-        if (class_id < 0 || class_id >= 80) {  // Assuming there are 80 classes (you might need to adjust this based on your model)
-            continue;
-        }
 
-        // Prepare the bounding box: [x_min, y_min, x_max, y_max]
-        std::vector<float> bbox = {output_data[i + 2], output_data[i + 3], output_data[i + 4], output_data[i + 5]};
-
-        // Apply the confidence threshold
-        if (confidence >= 0.5f) { // Filter based on confidence
-            detections.push_back(Detection(class_id, confidence, bbox));
-        }
-    }
-
-    // Print out the final detections
-    std::cout << "Number of detections: " << detections.size() << std::endl;
-    for (const auto& detection : detections) {
-        std::cout << "Class ID: " << detection.class_id 
-                << ", Confidence: " << detection.confidence
-                << ", BBox: [" << detection.bbox[0] << ", " 
-                << detection.bbox[1] << ", " 
-                << detection.bbox[2] << ", " 
-                << detection.bbox[3] << "]" << std::endl;
-    }
-
-    // Process the result (output_data should be a detection result)
-    std::cout << "Inference succeeded!" << std::endl;
-    // Further processing of result...
-
-    //ASSERT_TRUE(detected_dog) << "Dog not detected in the image.";
-}
+    ASSERT_TRUE(detections[0].class_id == 16);
+} 
 
 
 int main(int argc, char** argv) {
