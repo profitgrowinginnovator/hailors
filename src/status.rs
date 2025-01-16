@@ -1,5 +1,6 @@
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq)] 
+#[allow(dead_code)]
 pub enum HailoStatus {
     Success = 0,  // No error
     Uninitialized = 1,  // No error code initialized
@@ -26,7 +27,7 @@ pub enum HailoStatus {
     NotAvailable = 65,  // Component not available
     Unsupported = 79,  // Operation not supported
 }
-
+#[allow(dead_code)]
 impl HailoStatus {
     pub fn from_i32(value: i32) -> Self {
         match value {
@@ -90,5 +91,3 @@ impl std::fmt::Display for HailoStatus {
     }
 }
 
-
-     

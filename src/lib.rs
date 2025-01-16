@@ -2,22 +2,18 @@ use std::ffi::{CString, c_void};
 use std::ptr;
 use anyhow::Result;
 
-pub mod status;
+mod status;
 use status::HailoStatus;
-
-pub struct Detection {
-    pub class_id: u32,
-    pub confidence: f32,
-    pub bbox: (f32, f32, f32, f32),  // (x_min, y_min, x_max, y_max)
-}
+pub mod network;
+pub use crate::network::Network;
 
 pub struct HailoDevice {
-    device_handle: *mut c_void,
-    network_group: *mut c_void,
-    input_vstream: *mut c_void,
-    output_vstream: *mut c_void,
-    input_frame_size: usize,
-    output_frame_size: usize,
+    pub device_handle: *mut c_void,
+    pub network_group: *mut c_void,
+    pub input_vstream: *mut c_void,
+    pub output_vstream: *mut c_void,
+    pub input_frame_size: usize,
+    pub output_frame_size: usize,
 }
 
 impl HailoDevice {
@@ -82,28 +78,23 @@ impl HailoDevice {
     }
 
     /// Reads the output vstream and parses detection results
-    pub fn read_output(&self) -> Result<Vec<Detection>> {
-        let mut output_data = vec![0.0_f32; self.output_frame_size / 4];  // FLOAT32
+    pub fn read_output<T: Network>(&self, network_type: &T) -> Result<Vec<T::Output>> {
+        let mut output_data = vec![0.0_f32; self.output_frame_size / 4]; // FLOAT32
 
         unsafe {
-            let status = hailors_read_output_frame(self.output_vstream, output_data.as_mut_ptr() as *mut c_void, output_data.len() * 4);
+            let status = hailors_read_output_frame(
+                self.output_vstream,
+                output_data.as_mut_ptr() as *mut c_void,
+                output_data.len() * 4,
+            );
             if status != HailoStatus::Success {
                 return Err(anyhow::anyhow!("Failed to read output frame"));
             }
         }
 
-        // Example: Parse NMS output format into Detection structs
-        let detections: Vec<Detection> = output_data
-            .chunks(6)
-            .map(|chunk| Detection {
-                class_id: chunk[0] as u32,
-                confidence: chunk[1],
-                bbox: (chunk[2], chunk[3], chunk[4], chunk[5]),
-            })
-            .filter(|d| d.confidence > 0.5)
-            .collect();
-
-        Ok(detections)
+        // Use the network type to parse the output data
+        let results = network_type.parse_output(&output_data);
+        Ok(results)
     }
 }
 
