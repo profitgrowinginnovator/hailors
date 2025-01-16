@@ -234,7 +234,7 @@ TEST_F(HailoTestSuite, PerformInference) {
         float confidence = output_data[i + 1];
         
         // Print out the detected class ID and confidence
-        std::cout << "Class ID: " << class_id << ", Confidence: " << confidence << std::endl;
+        //std::cout << "Class ID: " << class_id << ", Confidence: " << confidence << std::endl;
 
         // Make sure that class_id is in range (if it's outside, ignore it)
         if (class_id < 0 || class_id >= 80) {  // Assuming there are 80 classes (you might need to adjust this based on your model)

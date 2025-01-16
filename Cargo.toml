@@ -21,10 +21,10 @@ autocxx = { version = "0.27.1", optional = true }
 cxx = "1.0.136"
 anyhow = "1.0.95"
 clap = "4.5.26"
+once_cell = "1.20.2"
 
 # Include dependencies needed for build.rs to function
 [build-dependencies]
-autocxx-build = "0.27.1"
 cc = "1.2.7"
 
 [features]
@@ -47,3 +47,6 @@ name = "hailors"
 path = "src/lib.rs"
 
 
+[[bin]]
+name = "example"  # You can change this name to something meaningful
+path = "src/main.rs"
