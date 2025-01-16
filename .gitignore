@@ -2,5 +2,4 @@
 Cargo.lock
 hailort.log
 pyhailort.log
-.vscode
 /build
