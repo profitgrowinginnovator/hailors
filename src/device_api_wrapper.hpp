@@ -27,7 +27,11 @@ hailo_status hailors_configure_hef(
     void ***output_vstreams,  // Pointer to an array of output vstreams
     size_t *output_count,     // Pointer to the number of output vstreams
     size_t* input_frame_size,   // New parameter for input frame size
-    size_t* output_frame_size  // New parameter for output frame size
+    size_t* output_frame_size,  // New parameter for output frame size
+    char ***output_names,     // Array of output layer names
+    size_t **output_element_sizes, // Array of element sizes for each output (e.g., 4 for FLOAT32, 1 for UINT8)
+    char ***output_data_types // Array of data types for each output layer (e.g., "FLOAT32", "UINT8")
+
 );
 
 hailo_status hailors_infer(

@@ -8,7 +8,7 @@ lazy_static! {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use hailors::{HailoDevice, network::YoloDetection};
+    use hailors::{network::{YoloDetection, YoloPose}, HailoDevice};
     use std::ptr;
 
     fn get_device_lock() -> MutexGuard<'static, ()> {
@@ -116,4 +116,76 @@ mod tests {
             "Dog was not detected in the image with sufficient confidence"
         );
     }
+
+
+    #[test]
+    fn test_pose_inference() {
+        // Path to the HEF file and input image
+        let hef_path = "./hef/yolov8s_pose_h8.hef";
+        let input_file_path = "./images/person.rgb";
+
+        // Create a HailoDevice
+        let device = Arc::new(Mutex::new(
+            HailoDevice::new(hef_path).expect("Failed to create HailoDevice"),
+        ));
+
+        let device_lock = device.lock().unwrap();
+
+        // Define the YOLO Pose network type
+        let yolo_pose_network = YoloPose {
+            num_keypoints: 17,   // Number of keypoints in pose detection
+            threshold: 0.5,      // Confidence threshold for keypoints
+            max_bboxes_per_class: 100,
+        };
+
+        // Read the input RGB file
+        let input_data = std::fs::read(input_file_path).expect("Failed to read input file");
+
+        // Verify that the input file size matches the expected input frame size
+        assert_eq!(
+            input_data.len(),
+            device_lock.input_frame_size,
+            "Input file size does not match the expected frame size"
+        );
+
+        // Write the input data to the device
+        device_lock
+            .write_input(&input_data)
+            .expect("Failed to write input frame");
+
+        // Perform inference and parse output into poses
+        let poses = device_lock
+            .read_output(&yolo_pose_network)
+            .expect("Failed to read and parse output");
+
+        // Verify that at least one pose is detected
+        assert!(
+            !poses.is_empty(),
+            "No poses found; check input or inference pipeline"
+        );
+
+        println!("poses dected: {:?}", poses.len());
+/* 
+        // Validate the detected poses
+        for pose in poses {
+            assert!(
+                pose.confidence >= 0.5,
+                "Pose confidence is below the threshold"
+            );
+            assert_eq!(
+                pose.keypoints.len(),
+                yolo_pose_network.num_keypoints,
+                "Number of keypoints does not match expected value"
+            );
+
+            // Print pose details for debugging
+            println!(
+                "Pose Confidence: {:.2}, Keypoints: {:?}",
+                pose.confidence, pose.keypoints
+            );
+        }
+*/        
+    }
+
+
 }

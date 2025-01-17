@@ -2,6 +2,7 @@
 #include <vector>
 #include <thread>
 #include <iostream>
+#include <cstring>
 
 using namespace hailort;
 
@@ -23,12 +24,15 @@ extern "C" hailo_status hailors_configure_hef(
     hailo_vdevice_handle vdevice,
     const char* hef_path,
     hailo_network_group_handle* network_group,
-    void ***input_vstreams,   // Pointer to an array of input vstreams
-    size_t *input_count,      // Pointer to the number of input vstreams
-    void ***output_vstreams,  // Pointer to an array of output vstreams
-    size_t *output_count,     // Pointer to the number of output vstreams
-    size_t* input_frame_size,   // New parameter for input frame size
-    size_t* output_frame_size  // New parameter for output frame size
+    void ***input_vstreams,
+    size_t *input_count,
+    void ***output_vstreams,
+    size_t *output_count,
+    size_t* input_frame_size,
+    size_t* output_frame_size,
+    char ***output_names,
+    size_t **output_element_sizes,
+    char ***output_data_types
 ) {
     // Initialize vstreams as empty
     *input_count = 0;
@@ -38,7 +42,7 @@ extern "C" hailo_status hailors_configure_hef(
     if (!hef_result) {
         return hef_result.status();
     }
-    auto hef = std::move(hef_result.value());  // Move instead of copy
+    auto hef = std::move(hef_result.value());
 
     auto configure_params = vdevice_ptr->create_configure_params(hef);
     if (!configure_params) {
@@ -58,7 +62,8 @@ extern "C" hailo_status hailors_configure_hef(
     }
 
     // Create input vstreams
-    auto input_vstream_params = configured_network_group->make_input_vstream_params(false, HAILO_FORMAT_TYPE_AUTO, HAILO_DEFAULT_VSTREAM_TIMEOUT_MS, HAILO_DEFAULT_VSTREAM_QUEUE_SIZE, "");
+    auto input_vstream_params = configured_network_group->make_input_vstream_params(
+        false, HAILO_FORMAT_TYPE_AUTO, HAILO_DEFAULT_VSTREAM_TIMEOUT_MS, HAILO_DEFAULT_VSTREAM_QUEUE_SIZE, "");
     if (!input_vstream_params) {
         return input_vstream_params.status();
     }
@@ -75,10 +80,10 @@ extern "C" hailo_status hailors_configure_hef(
         (*input_vstreams)[i] = new InputVStream(std::move(input_streams[i]));
     }
     *input_frame_size = input_streams.empty() ? 0 : static_cast<InputVStream*>((*input_vstreams)[0])->get_frame_size();
-    *input_count = input_streams.size();
 
     // Create output vstreams
-    auto output_vstream_params = configured_network_group->make_output_vstream_params(false, HAILO_FORMAT_TYPE_FLOAT32, HAILO_DEFAULT_VSTREAM_TIMEOUT_MS, HAILO_DEFAULT_VSTREAM_QUEUE_SIZE, "");
+    auto output_vstream_params = configured_network_group->make_output_vstream_params(
+        false, HAILO_FORMAT_TYPE_FLOAT32, HAILO_DEFAULT_VSTREAM_TIMEOUT_MS, HAILO_DEFAULT_VSTREAM_QUEUE_SIZE, "");
     if (!output_vstream_params) {
         return output_vstream_params.status();
     }
@@ -89,15 +94,34 @@ extern "C" hailo_status hailors_configure_hef(
     auto output_streams = std::move(output_streams_result.value());
     *output_count = output_streams.size();
 
-    // Populate output vstreams
+    // Allocate memory for additional fields
+    *output_names = static_cast<char**>(malloc(output_streams.size() * sizeof(char*)));
+    *output_element_sizes = static_cast<size_t*>(malloc(output_streams.size() * sizeof(size_t)));
+    *output_data_types = static_cast<char**>(malloc(output_streams.size() * sizeof(char*)));
+
+    // Populate output vstreams and additional fields
     *output_vstreams = static_cast<void**>(malloc(output_streams.size() * sizeof(void*)));
     for (size_t i = 0; i < output_streams.size(); i++) {
+        auto &vstream_info = output_streams[i].get_info();
         (*output_vstreams)[i] = new OutputVStream(std::move(output_streams[i]));
+
+        // Set output layer name
+        (*output_names)[i] = strdup(vstream_info.name);
+
+        // Populate output names, element sizes, and data types
+        (*output_names)[i] = strdup(vstream_info.name);
+        if (vstream_info.format.type == HAILO_FORMAT_TYPE_UINT8) {
+            (*output_element_sizes)[i] = 1;
+            (*output_data_types)[i] = strdup("UINT8");
+        } else if (vstream_info.format.type == HAILO_FORMAT_TYPE_FLOAT32) {
+            (*output_element_sizes)[i] = 4;
+            (*output_data_types)[i] = strdup("FLOAT32");
+        } else {
+            std::cerr << "Unsupported data type or format in vstream_info.format" << std::endl;
+            return HAILO_INVALID_ARGUMENT;
+        }
     }
     *output_frame_size = output_streams.empty() ? 0 : static_cast<OutputVStream*>((*output_vstreams)[0])->get_frame_size();
-    *output_count = output_streams.size();
-
-
 
     // Set the network group handle
     *network_group = configured_network_group.get();

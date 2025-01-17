@@ -1,5 +1,4 @@
 /target
 Cargo.lock
-hailort.log
-pyhailort.log
+*.log
 /build

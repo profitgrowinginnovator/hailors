@@ -14,7 +14,7 @@ struct Cli {
     /// Path to the Hailo Execution File (HEF).
     ///
     /// This file contains the compiled neural network model for the Hailo hardware.
-    #[arg(short, long)]
+    #[arg(long)]
     hef: String,
 
     /// Input file to process.
@@ -88,6 +88,7 @@ fn main() -> Result<()> {
             let network = hailors::network::YoloPose {
                 num_keypoints: 17,            // Number of keypoints for pose detection.
                 threshold: cli.threshold,     // Confidence threshold for detections.
+                max_bboxes_per_class: 100,
             };
 
             // Write the input data to the Hailo device for inference.
@@ -95,17 +96,35 @@ fn main() -> Result<()> {
                 .expect("Failed to write input frame to the Hailo device.");
 
             // Perform inference and parse the output into pose results.
-            let poses = device.read_output(&network)
+            let detection_and_poses = device.read_output(&network)
                 .expect("Failed to read and parse output from the Hailo device.");
 
             // Iterate over and display the pose detection results.
-            for pose in poses {
-                println!(
-                    "Pose Detection: Confidence {:.2}, Keypoints: {:?}",
-                    pose.confidence,           // Confidence score of the pose.
-                    pose.keypoints             // List of keypoints (X, Y coordinates).
-                );
+            // Assuming `detection_and_pose` is the result of your `parse_output` function.
+            for detection_and_pose in detection_and_poses {
+                // Print all detections
+                for detection in detection_and_pose.detections.iter() {
+                    println!(
+                        "Detection: Class ID {}, Confidence {:.2}, BBox: (x1: {:.2}, y1: {:.2}, x2: {:.2}, y2: {:.2})",
+                        detection.class_id,       // Class ID of the detection.
+                        detection.confidence,     // Confidence score of the detection.
+                        detection.bbox.0,         // X1 coordinate of the bounding box.
+                        detection.bbox.1,         // Y1 coordinate of the bounding box.
+                        detection.bbox.2,         // X2 coordinate of the bounding box.
+                        detection.bbox.3          // Y2 coordinate of the bounding box.
+                    );
+                }
+
+                // Print all poses
+                for pose in detection_and_pose.poses.iter() {
+                    println!(
+                        "Pose Detection: Confidence {:.2}, Keypoints: {:?}",
+                        pose.confidence,          // Confidence score of the pose.
+                        pose.keypoints            // List of keypoints (X, Y coordinates).
+                    );
+                }
             }
+
         }
     }
 

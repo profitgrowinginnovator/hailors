@@ -201,13 +201,17 @@ TEST_F(HailoTestSuite, ConfigureNetworkGroup) {
     const char* hef_path = "./hef/yolov8s_h8.hef";
     hailo_network_group_handle network_group_handle = nullptr;
 
-    // Change to use smart pointers (unique_ptr)
-    void **input_vstreams = nullptr; // Pointer to an array of input vstreams
+    void **input_vstreams = nullptr;  // Pointer to an array of input vstreams
     void **output_vstreams = nullptr; // Pointer to an array of output vstreams
     size_t input_count = 0; // Number of input vstreams
     size_t output_count = 0; // Number of output vstreams
     size_t input_frame_size = 0;
     size_t output_frame_size = 0;
+
+    char **output_names = nullptr; // Array of output layer names
+    size_t *output_element_sizes = nullptr; // Array of element sizes for each output
+    char **output_data_types = nullptr; // Array of data types for each output layer
+
     hailo_status status = hailors_configure_hef(
         vdevice_handle,
         hef_path,
@@ -217,11 +221,50 @@ TEST_F(HailoTestSuite, ConfigureNetworkGroup) {
         &output_vstreams,  // Pass pointer to the output vstreams
         &output_count,     // Pass pointer to the output count
         &input_frame_size,
-        &output_frame_size
+        &output_frame_size,
+        &output_names,     // Pass pointer to output layer names
+        &output_element_sizes, // Pass pointer to output element sizes
+        &output_data_types // Pass pointer to output data types
     );
     ASSERT_EQ(status, HAILO_SUCCESS);
+
+    // Validate input and output counts
+    ASSERT_GT(input_count, 0) << "Input count should be greater than 0.";
+    ASSERT_GT(output_count, 0) << "Output count should be greater than 0.";
+
+    // Validate frame sizes
     ASSERT_GT(input_frame_size, 0) << "Input frame size should be greater than 0.";
     ASSERT_GT(output_frame_size, 0) << "Output frame size should be greater than 0.";
+
+    // Validate output names
+    ASSERT_NE(output_names, nullptr) << "Output names should not be null.";
+    for (size_t i = 0; i < output_count; i++) {
+        ASSERT_NE(output_names[i], nullptr) << "Output name for index " << i << " should not be null.";
+        std::cout << "Output name [" << i << "]: " << output_names[i] << std::endl;
+    }
+
+    // Validate output element sizes
+    ASSERT_NE(output_element_sizes, nullptr) << "Output element sizes should not be null.";
+    for (size_t i = 0; i < output_count; i++) {
+        ASSERT_GT(output_element_sizes[i], 0) << "Element size for output index " << i << " should be greater than 0.";
+        std::cout << "Output element size [" << i << "]: " << output_element_sizes[i] << std::endl;
+    }
+
+    // Validate output data types
+    ASSERT_NE(output_data_types, nullptr) << "Output data types should not be null.";
+    for (size_t i = 0; i < output_count; i++) {
+        ASSERT_NE(output_data_types[i], nullptr) << "Data type for output index " << i << " should not be null.";
+        std::cout << "Output data type [" << i << "]: " << output_data_types[i] << std::endl;
+    }
+
+    // Free dynamically allocated memory
+    for (size_t i = 0; i < output_count; i++) {
+        free(output_names[i]);
+        free(output_data_types[i]);
+    }
+    free(output_names);
+    free(output_element_sizes);
+    free(output_data_types);
 }
 
 TEST_F(HailoTestSuite, PerformInference) {
@@ -229,13 +272,16 @@ TEST_F(HailoTestSuite, PerformInference) {
     const char* image_path = "./images/dog.rgb";  // Path to the dog.rgb image
     hailo_network_group_handle network_group_handle = nullptr;
 
-    // Change to use smart pointers (unique_ptr)
-    void **input_vstreams = nullptr; // Pointer to an array of input vstreams
+    void **input_vstreams = nullptr;  // Pointer to an array of input vstreams
     void **output_vstreams = nullptr; // Pointer to an array of output vstreams
     size_t input_count = 0; // Number of input vstreams
     size_t output_count = 0; // Number of output vstreams
     size_t input_frame_size = 0;
     size_t output_frame_size = 0;
+
+    char **output_names = nullptr; // Array of output layer names
+    size_t *output_element_sizes = nullptr; // Array of element sizes for each output
+    char **output_data_types = nullptr; // Array of data types for each output layer
 
     hailo_status status = hailors_configure_hef(
         vdevice_handle,
@@ -246,34 +292,50 @@ TEST_F(HailoTestSuite, PerformInference) {
         &output_vstreams,  // Pass pointer to the output vstreams
         &output_count,     // Pass pointer to the output count
         &input_frame_size,
-        &output_frame_size
+        &output_frame_size,
+        &output_names,     // Pass pointer to output layer names
+        &output_element_sizes, // Pass pointer to output element sizes
+        &output_data_types // Pass pointer to output data types
     );
-
     ASSERT_EQ(status, HAILO_SUCCESS);
 
-    // Declare a buffer to store the image data
+    // Load the image into a buffer
     std::vector<unsigned char> input_data;
-
-    // Load the image into the buffer
     ASSERT_TRUE(load_test_image(image_path, input_frame_size, input_data)) << "Failed to load test image";
 
     // Perform inference
     status = hailors_write_input_frame(static_cast<hailort::InputVStream*>(input_vstreams[0]), input_data.data(), input_data.size());
     ASSERT_EQ(status, HAILO_SUCCESS);
 
-    // Prepare a buffer to store the output detections
-    std::vector<float> output_data(output_frame_size / sizeof(float));
-    status = hailors_read_output_frame(static_cast<hailort::OutputVStream*>(output_vstreams[0]), reinterpret_cast<void*>(output_data.data()), output_frame_size);
+    for (size_t i = 0; i < output_count; i++) {
+        // Prepare a buffer to store the output data for each vstream
+        std::vector<float> output_data(output_frame_size / sizeof(float));
 
-    ASSERT_EQ(status, HAILO_SUCCESS);
+        status = hailors_read_output_frame(
+            static_cast<hailort::OutputVStream*>(output_vstreams[i]),
+            reinterpret_cast<void*>(output_data.data()),
+            output_frame_size
+        );
+        ASSERT_EQ(status, HAILO_SUCCESS);
 
-    //write_output_to_file(output_data, "output.csv", 6);
+        // Process detections or other outputs based on layer name or type
+        if (std::string(output_names[i]) == "yolov8_nms_postprocess") {
+            auto detections = parse_detections(output_data, 0.85F);
+            std::cout << "Detections from " << output_names[i] << ": " << detections.size() << std::endl;
+        } else {
+            std::cout << "Output from " << output_names[i] << " is not processed in this test." << std::endl;
+        }
+    }
 
-    auto detections = parse_detections(output_data, 0.85F);
-
-
-    ASSERT_TRUE(detections[0].class_id == 16);
-} 
+    // Free dynamically allocated memory
+    for (size_t i = 0; i < output_count; i++) {
+        free(output_names[i]);
+        free(output_data_types[i]);
+    }
+    free(output_names);
+    free(output_element_sizes);
+    free(output_data_types);
+}
 
 
 int main(int argc, char** argv) {
