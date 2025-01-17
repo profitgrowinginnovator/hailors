@@ -71,8 +71,10 @@ cd hailors
 2. Install Dependencies:
 
 ```bash
-sudo dpkg -i libhailort.deb
-sudo apt-get -f install  # Resolve dependencies
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y # install RUST
+source "$HOME/.cargo/env"
+sudo apt install -y hailo-all # install HAILO - For setting up the Hailo AI Hat+ on a Raspberry Pi, follow [this guide](https://www.raspberrypi.com/documentation/computers/ai.html).
+sudo apt-get install -y build-essential g++ gcc cmake make libtool autoconf automake pkg-config lldb gdb # optional: if you want to recompile the C++ code
 ```
 
 3. Build the Project:
