@@ -6,18 +6,12 @@ pub trait Network {
     fn parse_output(&self, output_data: &[f32]) -> Vec<Self::Output>;
 }
 
-
 /// Supported network types for the CLI
 #[derive(clap::ValueEnum, Clone, Debug)]
 pub enum NetworkType {
     YoloDetection,
     YoloPose,
 }
-
-
-
-
-
 pub struct YoloDetection {
     pub num_classes: usize,
     pub max_bboxes_per_class: usize,
@@ -38,28 +32,48 @@ impl Network for YoloDetection {
         let mut offset = 0;
 
         for class_id in 0..self.num_classes {
+            // Ensure there is enough data for bbox_count
+            if offset >= output_data.len() {
+                break;
+            }
             let bbox_count = output_data[offset] as usize; // Number of bounding boxes for this class
             offset += 1;
 
-            for _ in 0..bbox_count {
-                if offset + 6 > output_data.len() {
+            // Validate bbox_count against max_bboxes_per_class
+            if bbox_count > self.max_bboxes_per_class {
+                eprintln!(
+                    "Warning: Class {} has bbox_count {} exceeding max_bboxes_per_class {}. Truncating.",
+                    class_id, bbox_count, self.max_bboxes_per_class
+                );
+            }
+
+            let valid_bbox_count = bbox_count.min(self.max_bboxes_per_class);
+
+            for _ in 0..valid_bbox_count {
+                // Ensure there is enough data for a complete bounding box
+                if offset + 5 > output_data.len() {
+                    eprintln!(
+                        "Warning: Truncated data for class {}. Expected complete bbox, but data is insufficient.",
+                        class_id
+                    );
                     break;
                 }
 
+                let x1 = output_data[offset];
+                let y1 = output_data[offset + 1];
+                let x2 = output_data[offset + 2];
+                let y2 = output_data[offset + 3];
                 let confidence = output_data[offset + 4];
+
                 if confidence >= self.threshold {
                     detections.push(Detection {
                         class_id: class_id as u32,
                         confidence,
-                        bbox: (
-                            output_data[offset],     // x_min
-                            output_data[offset + 1], // y_min
-                            output_data[offset + 2], // x_max
-                            output_data[offset + 3], // y_max
-                        ),
+                        bbox: (x1, y1, x2, y2),
                     });
                 }
-                offset += 6;
+
+                offset += 5; // Each bbox consumes 5 values
             }
         }
 

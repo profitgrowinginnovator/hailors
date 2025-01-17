@@ -202,18 +202,22 @@ TEST_F(HailoTestSuite, ConfigureNetworkGroup) {
     hailo_network_group_handle network_group_handle = nullptr;
 
     // Change to use smart pointers (unique_ptr)
-    std::vector<std::unique_ptr<hailort::InputVStream>> input_vstreams;
-    std::vector<std::unique_ptr<hailort::OutputVStream>> output_vstreams;
-
-    size_t input_count = 16;
-    size_t output_count = 16;
+    void **input_vstreams = nullptr; // Pointer to an array of input vstreams
+    void **output_vstreams = nullptr; // Pointer to an array of output vstreams
+    size_t input_count = 0; // Number of input vstreams
+    size_t output_count = 0; // Number of output vstreams
     size_t input_frame_size = 0;
     size_t output_frame_size = 0;
-
     hailo_status status = hailors_configure_hef(
-        vdevice_handle, hef_path, &network_group_handle,
-        &input_vstreams, &input_count, &output_vstreams, &output_count,
-        &input_frame_size, &output_frame_size
+        vdevice_handle,
+        hef_path,
+        &network_group_handle,
+        &input_vstreams,   // Pass pointer to the input vstreams
+        &input_count,      // Pass pointer to the input count
+        &output_vstreams,  // Pass pointer to the output vstreams
+        &output_count,     // Pass pointer to the output count
+        &input_frame_size,
+        &output_frame_size
     );
     ASSERT_EQ(status, HAILO_SUCCESS);
     ASSERT_GT(input_frame_size, 0) << "Input frame size should be greater than 0.";
@@ -226,18 +230,23 @@ TEST_F(HailoTestSuite, PerformInference) {
     hailo_network_group_handle network_group_handle = nullptr;
 
     // Change to use smart pointers (unique_ptr)
-    std::vector<std::unique_ptr<hailort::InputVStream>> input_vstreams;
-    std::vector<std::unique_ptr<hailort::OutputVStream>> output_vstreams;
-
-    size_t input_count = 16;
-    size_t output_count = 16;
+    void **input_vstreams = nullptr; // Pointer to an array of input vstreams
+    void **output_vstreams = nullptr; // Pointer to an array of output vstreams
+    size_t input_count = 0; // Number of input vstreams
+    size_t output_count = 0; // Number of output vstreams
     size_t input_frame_size = 0;
     size_t output_frame_size = 0;
 
     hailo_status status = hailors_configure_hef(
-        vdevice_handle, hef_path, &network_group_handle,
-        &input_vstreams, &input_count, &output_vstreams, &output_count,
-        &input_frame_size, &output_frame_size
+        vdevice_handle,
+        hef_path,
+        &network_group_handle,
+        &input_vstreams,   // Pass pointer to the input vstreams
+        &input_count,      // Pass pointer to the input count
+        &output_vstreams,  // Pass pointer to the output vstreams
+        &output_count,     // Pass pointer to the output count
+        &input_frame_size,
+        &output_frame_size
     );
 
     ASSERT_EQ(status, HAILO_SUCCESS);
@@ -249,12 +258,12 @@ TEST_F(HailoTestSuite, PerformInference) {
     ASSERT_TRUE(load_test_image(image_path, input_frame_size, input_data)) << "Failed to load test image";
 
     // Perform inference
-    status = hailors_write_input_frame(input_vstreams[0].get(), input_data.data(), input_data.size());
+    status = hailors_write_input_frame(static_cast<hailort::InputVStream*>(input_vstreams[0]), input_data.data(), input_data.size());
     ASSERT_EQ(status, HAILO_SUCCESS);
 
     // Prepare a buffer to store the output detections
     std::vector<float> output_data(output_frame_size / sizeof(float));
-    status = hailors_read_output_frame(output_vstreams[0].get(), reinterpret_cast<void*>(output_data.data()), output_frame_size);
+    status = hailors_read_output_frame(static_cast<hailort::OutputVStream*>(output_vstreams[0]), reinterpret_cast<void*>(output_data.data()), output_frame_size);
 
     ASSERT_EQ(status, HAILO_SUCCESS);
 

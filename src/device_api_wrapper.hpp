@@ -22,10 +22,10 @@ hailo_status hailors_configure_hef(
     hailo_vdevice_handle vdevice,
     const char* hef_path,
     hailo_network_group_handle* network_group,
-    std::vector<std::unique_ptr<hailort::InputVStream>>* input_vstreams,  // Vector of smart pointers to input streams
-    size_t* input_count,
-    std::vector<std::unique_ptr<hailort::OutputVStream>>* output_vstreams,  // Vector of smart pointers to output streams
-    size_t* output_count,
+    void ***input_vstreams,   // Pointer to an array of input vstreams
+    size_t *input_count,      // Pointer to the number of input vstreams
+    void ***output_vstreams,  // Pointer to an array of output vstreams
+    size_t *output_count,     // Pointer to the number of output vstreams
     size_t* input_frame_size,   // New parameter for input frame size
     size_t* output_frame_size  // New parameter for output frame size
 );

@@ -23,13 +23,16 @@ extern "C" hailo_status hailors_configure_hef(
     hailo_vdevice_handle vdevice,
     const char* hef_path,
     hailo_network_group_handle* network_group,
-    std::vector<std::unique_ptr<hailort::InputVStream>>* input_vstreams,  // Vector of smart pointers to input streams
-    size_t* input_count,
-    std::vector<std::unique_ptr<hailort::OutputVStream>>* output_vstreams,  // Vector of smart pointers to output streams
-    size_t* output_count,
+    void ***input_vstreams,   // Pointer to an array of input vstreams
+    size_t *input_count,      // Pointer to the number of input vstreams
+    void ***output_vstreams,  // Pointer to an array of output vstreams
+    size_t *output_count,     // Pointer to the number of output vstreams
     size_t* input_frame_size,   // New parameter for input frame size
     size_t* output_frame_size  // New parameter for output frame size
 ) {
+    // Initialize vstreams as empty
+    *input_count = 0;
+    *output_count = 0;
     auto vdevice_ptr = static_cast<VDevice*>(vdevice);
     auto hef_result = Hef::create(hef_path);
     if (!hef_result) {
@@ -66,20 +69,13 @@ extern "C" hailo_status hailors_configure_hef(
     auto input_streams = std::move(input_streams_result.value());
     *input_count = input_streams.size();
 
-    
-    // Reserve space for the input vstreams in the vector
-    input_vstreams->reserve(*input_count);
-
-    // Move the input streams from input_streams to input_vstreams
-    for (size_t i = 0; i < *input_count; ++i) {
-        input_vstreams->emplace_back(std::make_unique<hailort::InputVStream>(std::move(input_streams[i])));
+    // Populate input vstreams
+    *input_vstreams = static_cast<void**>(malloc(input_streams.size() * sizeof(void*)));
+    for (size_t i = 0; i < input_streams.size(); i++) {
+        (*input_vstreams)[i] = new InputVStream(std::move(input_streams[i]));
     }
-    // Set input frame size (assuming all inputs have the same size for simplicity)
-    if (*input_count > 0) {
-        *input_frame_size = (*input_vstreams)[0]->get_frame_size();  // Query frame size of the first input stream
-    } else {
-        *input_frame_size = 0;  // No input streams available
-    }
+    *input_frame_size = input_streams.empty() ? 0 : static_cast<InputVStream*>((*input_vstreams)[0])->get_frame_size();
+    *input_count = input_streams.size();
 
     // Create output vstreams
     auto output_vstream_params = configured_network_group->make_output_vstream_params(false, HAILO_FORMAT_TYPE_FLOAT32, HAILO_DEFAULT_VSTREAM_TIMEOUT_MS, HAILO_DEFAULT_VSTREAM_QUEUE_SIZE, "");
@@ -93,19 +89,15 @@ extern "C" hailo_status hailors_configure_hef(
     auto output_streams = std::move(output_streams_result.value());
     *output_count = output_streams.size();
 
-    // Reserve space for the input vstreams in the vector
-    output_vstreams->reserve(*output_count);
+    // Populate output vstreams
+    *output_vstreams = static_cast<void**>(malloc(output_streams.size() * sizeof(void*)));
+    for (size_t i = 0; i < output_streams.size(); i++) {
+        (*output_vstreams)[i] = new OutputVStream(std::move(output_streams[i]));
+    }
+    *output_frame_size = output_streams.empty() ? 0 : static_cast<OutputVStream*>((*output_vstreams)[0])->get_frame_size();
+    *output_count = output_streams.size();
 
-    // Move the input streams from input_streams to input_vstreams
-    for (size_t i = 0; i < *output_count; ++i) {
-        output_vstreams->emplace_back(std::make_unique<hailort::OutputVStream>(std::move(output_streams[i])));
-    }
-    // Set input frame size (assuming all inputs have the same size for simplicity)
-    if (*output_count > 0) {
-        *output_frame_size = (*output_vstreams)[0]->get_frame_size();  // Query frame size of the first input stream
-    } else {
-        *output_frame_size = 0;  // No input streams available
-    }
+
 
     // Set the network group handle
     *network_group = configured_network_group.get();

@@ -10,8 +10,8 @@ pub use crate::network::Network;
 pub struct HailoDevice {
     pub device_handle: *mut c_void,
     pub network_group: *mut c_void,
-    pub input_vstream: *mut c_void,
-    pub output_vstream: *mut c_void,
+    pub input_vstream: *mut *mut c_void,
+    pub output_vstream: *mut *mut c_void,
     pub input_frame_size: usize,
     pub output_frame_size: usize,
 }
@@ -21,8 +21,10 @@ impl HailoDevice {
     pub fn new(hef_path: &str) -> Result<Self> {
         let mut device_handle: *mut c_void = ptr::null_mut();
         let mut network_group: *mut c_void = ptr::null_mut();
-        let mut input_vstream: *mut c_void = ptr::null_mut();
-        let mut output_vstream: *mut c_void = ptr::null_mut();
+        let mut input_vstreams: *mut *mut c_void = ptr::null_mut(); // Pointer to an array of input vstreams
+        let mut output_vstreams: *mut *mut c_void = ptr::null_mut(); // Pointer to an array of output vstreams    
+        let mut input_count: usize = 0;
+        let mut output_count: usize = 0;
         let mut input_frame_size: usize = 0;
         let mut output_frame_size: usize = 0;
 
@@ -38,21 +40,30 @@ impl HailoDevice {
                 device_handle,
                 hef_path_cstr.as_ptr() as *const i8,
                 &mut network_group,
-                &mut input_vstream,
-                &mut output_vstream,
+                &mut input_vstreams,
+                &mut input_count,
+                &mut output_vstreams,
+                &mut output_count,
                 &mut input_frame_size,
                 &mut output_frame_size,
             );
             if configure_status != HailoStatus::Success {
                 return Err(anyhow::anyhow!("Failed to configure HEF"));
             }
+
+            // Step 3: Free memory for input and output vstreams (if necessary)
+            // Example: Ensure we handle dynamically allocated resources appropriately
+            if input_vstreams.is_null() || output_vstreams.is_null() {
+                hailors_release_vdevice(device_handle);
+                return Err(anyhow::anyhow!("Failed to allocate input or output vstreams"));
+            }
         }
 
         Ok(Self {
             device_handle,
             network_group,
-            input_vstream,
-            output_vstream,
+            input_vstream: input_vstreams,
+            output_vstream: output_vstreams,
             input_frame_size,
             output_frame_size,
         })
@@ -69,7 +80,7 @@ impl HailoDevice {
         }
 
         unsafe {
-            let status = hailors_write_input_frame(self.input_vstream, frame.as_ptr() as *const c_void, frame.len());
+            let status = hailors_write_input_frame(*self.input_vstream, frame.as_ptr() as *const c_void, frame.len());
             if status != HailoStatus::Success {
                 return Err(anyhow::anyhow!("Failed to write input frame"));
             }
@@ -83,7 +94,7 @@ impl HailoDevice {
 
         unsafe {
             let status = hailors_read_output_frame(
-                self.output_vstream,
+                *self.output_vstream,
                 output_data.as_mut_ptr() as *mut c_void,
                 output_data.len() * 4,
             );
@@ -112,8 +123,10 @@ extern "C" {
         device_handle: *mut c_void,
         hef_path: *const i8,
         network_group: *mut *mut c_void,
-        input_vstream: *mut *mut c_void,
-        output_vstream: *mut *mut c_void,
+        input_vstreams: *mut *mut *mut c_void, // Pointer to an array of input vstreams
+        input_count: *mut usize,               // Pointer to the number of input vstreams
+        output_vstreams: *mut *mut *mut c_void, // Pointer to an array of output vstreams
+        output_count: *mut usize,              // Pointer to the number of output vstreams
         input_frame_size: *mut usize,
         output_frame_size: *mut usize,
     ) -> HailoStatus;
