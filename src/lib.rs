@@ -1,126 +1,136 @@
-// Include the necessary imports and macros.
-pub mod status;
-
-pub use status::HailoStatus;
-pub use autocxx::prelude::*;
-use std::ffi::CString;
+use std::ffi::{CString, c_void};
 use std::ptr;
+use anyhow::Result;
 
+mod status;
+use status::HailoStatus;
+pub mod network;
+pub use crate::network::Network;
 
-
-
-include_cpp! {
-    #include "custom_wrapper.hpp"
-    #include "device_api_wrapper.hpp"
-    generate!("hailors_create_vdevice")
-    generate!("hailors_release_vdevice")
-    generate!("hailors_configure_hef")
-    generate!("hailors_infer")
-    safety!(unsafe)
-}
-
-pub type ConfiguredNetworkGroup = c_void;
-pub type InputVStream = c_void;
-pub type OutputVStream = c_void;
-
-/// A struct representing a `HailoDevice`.
 pub struct HailoDevice {
-    handle: *mut c_void,
+    pub device_handle: *mut c_void,
+    pub network_group: *mut c_void,
+    pub input_vstream: *mut *mut c_void,
+    pub output_vstream: *mut *mut c_void,
+    pub input_frame_size: usize,
+    pub output_frame_size: usize,
 }
 
 impl HailoDevice {
-    /// Creates a new HailoDevice.
-    pub fn new() -> Result<Self, HailoStatus> {
-        let mut raw_handle: *mut c_void = ptr::null_mut();
-        let status = unsafe { ffi::hailors_create_vdevice(&mut raw_handle as *mut *mut c_void) };
+    /// Creates a new Hailo device and configures it with the provided HEF file
+    pub fn new(hef_path: &str) -> Result<Self> {
+        let mut device_handle: *mut c_void = ptr::null_mut();
+        let mut network_group: *mut c_void = ptr::null_mut();
+        let mut input_vstreams: *mut *mut c_void = ptr::null_mut(); // Pointer to an array of input vstreams
+        let mut output_vstreams: *mut *mut c_void = ptr::null_mut(); // Pointer to an array of output vstreams    
+        let mut input_count: usize = 0;
+        let mut output_count: usize = 0;
+        let mut input_frame_size: usize = 0;
+        let mut output_frame_size: usize = 0;
 
-        if status == ffi::hailo_status::HAILO_SUCCESS {
-            Ok(Self { handle: raw_handle })
-        } else {
-            Err(HailoStatus::from_i32(status as i32))
-        }
-    }
+        // Call FFI function to configure the HEF and vstreams
+        let hef_path_cstr = CString::new(hef_path)?;
+        unsafe {
+            let status = hailors_create_vdevice(&mut device_handle);
+            if status != HailoStatus::Success {
+                return Err(anyhow::anyhow!("Failed to create VDevice"));
+            }
 
-    /// Configures a HEF file for the device.
-    pub fn configure_hef(
-        &self,
-        hef_path: &str,
-        input_vstreams: &mut [*mut InputVStream],
-        output_vstreams: &mut [*mut OutputVStream],
-    ) -> Result<*mut ConfiguredNetworkGroup, HailoStatus> {
-        let mut network_group: *mut ConfiguredNetworkGroup = ptr::null_mut();
-        let c_hef_path = CString::new(hef_path).expect("Invalid HEF path");
-
-        let mut input_count = input_vstreams.len();
-        let mut output_count = output_vstreams.len();
-
-        let status = unsafe {
-            ffi::hailors_configure_hef(
-                self.handle,
-                c_hef_path.as_ptr(),
-                &mut network_group as *mut _ as *mut *mut c_void, 
-                input_vstreams.as_mut_ptr() as *mut *mut c_void,
+            let configure_status = hailors_configure_hef(
+                device_handle,
+                hef_path_cstr.as_ptr() as *const i8,
+                &mut network_group,
+                &mut input_vstreams,
                 &mut input_count,
-                output_vstreams.as_mut_ptr() as *mut *mut c_void, 
+                &mut output_vstreams,
                 &mut output_count,
-            )
-        };
+                &mut input_frame_size,
+                &mut output_frame_size,
+            );
+            if configure_status != HailoStatus::Success {
+                return Err(anyhow::anyhow!("Failed to configure HEF"));
+            }
 
-        if status == ffi::hailo_status::HAILO_SUCCESS {
-            Ok(network_group)
-        } else {
-            Err(HailoStatus::from_i32(status as i32))
+            // Step 3: Free memory for input and output vstreams (if necessary)
+            // Example: Ensure we handle dynamically allocated resources appropriately
+            if input_vstreams.is_null() || output_vstreams.is_null() {
+                hailors_release_vdevice(device_handle);
+                return Err(anyhow::anyhow!("Failed to allocate input or output vstreams"));
+            }
         }
+
+        Ok(Self {
+            device_handle,
+            network_group,
+            input_vstream: input_vstreams,
+            output_vstream: output_vstreams,
+            input_frame_size,
+            output_frame_size,
+        })
     }
 
-    /// Releases the device.
-    pub fn release(&mut self) -> Result<(), HailoStatus> {
-        if self.handle.is_null() {
-            return Err(HailoStatus::InvalidOperation);
+    /// Writes a frame to the input vstream (handles preprocessing)
+    pub fn write_input(&self, frame: &[u8]) -> Result<()> {
+        if frame.len() != self.input_frame_size {
+            return Err(anyhow::anyhow!(
+                "Input frame size mismatch: expected {}, got {}",
+                self.input_frame_size,
+                frame.len()
+            ));
         }
 
-        let status = unsafe { ffi::hailors_release_vdevice(self.handle) };
-        if status == ffi::hailo_status::HAILO_SUCCESS {
-            self.handle = ptr::null_mut();
-            Ok(())
-        } else {
-            Err(HailoStatus::from_i32(status as i32))
+        unsafe {
+            let status = hailors_write_input_frame(*self.input_vstream, frame.as_ptr() as *const c_void, frame.len());
+            if status != HailoStatus::Success {
+                return Err(anyhow::anyhow!("Failed to write input frame"));
+            }
         }
+        Ok(())
     }
 
-    /// Inference function for testing the configuration.
-    pub fn infer(
-        &self,
-        network_group: *mut ConfiguredNetworkGroup,
-        input_vstreams: &mut [*mut InputVStream],  // `&mut` instead of `&`
-        output_vstreams: &mut [*mut OutputVStream],
-    ) -> Result<(), HailoStatus> {
-        let status = unsafe {
-            ffi::hailors_infer(
-                network_group as *mut c_void,
-                input_vstreams.as_mut_ptr() as *mut *mut c_void,  // Cast to `*mut *mut c_void`
-                input_vstreams.len(),
-                output_vstreams.as_mut_ptr() as *mut *mut c_void, // Cast to `*mut *mut c_void`
-                output_vstreams.len(),
-            )
-        };
+    /// Reads the output vstream and parses detection results
+    pub fn read_output<T: Network>(&self, network_type: &T) -> Result<Vec<T::Output>> {
+        let mut output_data = vec![0.0_f32; self.output_frame_size / 4]; // FLOAT32
 
-        if status == ffi::hailo_status::HAILO_SUCCESS {
-            Ok(())
-        } else {
-            Err(HailoStatus::from_i32(status as i32))
+        unsafe {
+            let status = hailors_read_output_frame(
+                *self.output_vstream,
+                output_data.as_mut_ptr() as *mut c_void,
+                output_data.len() * 4,
+            );
+            if status != HailoStatus::Success {
+                return Err(anyhow::anyhow!("Failed to read output frame"));
+            }
         }
+
+        // Use the network type to parse the output data
+        let results = network_type.parse_output(&output_data);
+        Ok(results)
     }
 }
 
 impl Drop for HailoDevice {
     fn drop(&mut self) {
-        if !self.handle.is_null() {
-            if let Err(e) = self.release() {
-                eprintln!("Failed to release VDevice: {}", e);
-            }
+        unsafe {
+            hailors_release_vdevice(self.device_handle);
         }
     }
 }
 
-
+extern "C" {
+    fn hailors_create_vdevice(device_handle: *mut *mut c_void) -> HailoStatus;
+    fn hailors_configure_hef(
+        device_handle: *mut c_void,
+        hef_path: *const i8,
+        network_group: *mut *mut c_void,
+        input_vstreams: *mut *mut *mut c_void, // Pointer to an array of input vstreams
+        input_count: *mut usize,               // Pointer to the number of input vstreams
+        output_vstreams: *mut *mut *mut c_void, // Pointer to an array of output vstreams
+        output_count: *mut usize,              // Pointer to the number of output vstreams
+        input_frame_size: *mut usize,
+        output_frame_size: *mut usize,
+    ) -> HailoStatus;
+    fn hailors_write_input_frame(input_vstream: *mut c_void, data: *const c_void, len: usize) -> HailoStatus;
+    fn hailors_read_output_frame(output_vstream: *mut c_void, data: *mut c_void, len: usize) -> HailoStatus;
+    fn hailors_release_vdevice(device_handle: *mut c_void) -> HailoStatus;
+}

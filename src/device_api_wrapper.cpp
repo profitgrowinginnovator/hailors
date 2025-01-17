@@ -23,11 +23,16 @@ extern "C" hailo_status hailors_configure_hef(
     hailo_vdevice_handle vdevice,
     const char* hef_path,
     hailo_network_group_handle* network_group,
-    hailo_input_vstream_handle* input_vstreams,
-    size_t* input_count,
-    hailo_output_vstream_handle* output_vstreams,
-    size_t* output_count) {
-
+    void ***input_vstreams,   // Pointer to an array of input vstreams
+    size_t *input_count,      // Pointer to the number of input vstreams
+    void ***output_vstreams,  // Pointer to an array of output vstreams
+    size_t *output_count,     // Pointer to the number of output vstreams
+    size_t* input_frame_size,   // New parameter for input frame size
+    size_t* output_frame_size  // New parameter for output frame size
+) {
+    // Initialize vstreams as empty
+    *input_count = 0;
+    *output_count = 0;
     auto vdevice_ptr = static_cast<VDevice*>(vdevice);
     auto hef_result = Hef::create(hef_path);
     if (!hef_result) {
@@ -63,9 +68,14 @@ extern "C" hailo_status hailors_configure_hef(
     }
     auto input_streams = std::move(input_streams_result.value());
     *input_count = input_streams.size();
-    for (size_t i = 0; i < *input_count; ++i) {
-        input_vstreams[i] = new InputVStream(std::move(input_streams[i]));  // Move instead of copy
+
+    // Populate input vstreams
+    *input_vstreams = static_cast<void**>(malloc(input_streams.size() * sizeof(void*)));
+    for (size_t i = 0; i < input_streams.size(); i++) {
+        (*input_vstreams)[i] = new InputVStream(std::move(input_streams[i]));
     }
+    *input_frame_size = input_streams.empty() ? 0 : static_cast<InputVStream*>((*input_vstreams)[0])->get_frame_size();
+    *input_count = input_streams.size();
 
     // Create output vstreams
     auto output_vstream_params = configured_network_group->make_output_vstream_params(false, HAILO_FORMAT_TYPE_FLOAT32, HAILO_DEFAULT_VSTREAM_TIMEOUT_MS, HAILO_DEFAULT_VSTREAM_QUEUE_SIZE, "");
@@ -78,15 +88,23 @@ extern "C" hailo_status hailors_configure_hef(
     }
     auto output_streams = std::move(output_streams_result.value());
     *output_count = output_streams.size();
-    for (size_t i = 0; i < *output_count; ++i) {
-        output_vstreams[i] = new OutputVStream(std::move(output_streams[i]));  // Move instead of copy
+
+    // Populate output vstreams
+    *output_vstreams = static_cast<void**>(malloc(output_streams.size() * sizeof(void*)));
+    for (size_t i = 0; i < output_streams.size(); i++) {
+        (*output_vstreams)[i] = new OutputVStream(std::move(output_streams[i]));
     }
+    *output_frame_size = output_streams.empty() ? 0 : static_cast<OutputVStream*>((*output_vstreams)[0])->get_frame_size();
+    *output_count = output_streams.size();
+
+
 
     // Set the network group handle
     *network_group = configured_network_group.get();
 
     return HAILO_SUCCESS;
 }
+
 
 extern "C" hailo_status hailors_infer(hailo_network_group_handle network_group, void **input_vstreams, size_t input_count, void **output_vstreams, size_t output_count)
 {
@@ -144,6 +162,68 @@ extern "C" hailo_status hailors_infer(hailo_network_group_handle network_group, 
         std::cout << "Inference completed successfully." << std::endl;
     } else {
         std::cerr << "Inference failed with status: " << status << std::endl;
+    }
+
+    return status;
+}
+
+extern "C" hailo_status hailors_write_input_frame(
+    hailo_input_vstream_handle input_vstream,
+    const void* data,
+    size_t data_size
+) {
+    if (!input_vstream || !data) {
+        std::cerr << "Invalid input stream handle or data buffer." << std::endl;
+        return HAILO_INVALID_ARGUMENT;
+    }
+
+    // Cast the handle to InputVStream
+    auto vstream = static_cast<hailort::InputVStream*>(input_vstream);
+
+    // Create a MemoryView for the input data (casting to `void*`)
+    hailort::MemoryView input_view(const_cast<void*>(data), data_size);
+
+    // Write data using the MemoryView
+    auto status = vstream->write(input_view);
+    if (status != HAILO_SUCCESS) {
+        std::cerr << "Failed to write data to input vstream. Status: " << status << std::endl;
+    }
+
+    return status;
+}
+
+extern "C" hailo_status hailors_read_output_frame(
+    void* output_vstream, 
+    void* buffer,
+    size_t buffer_size
+) {
+    if (!output_vstream) {
+        std::cerr << "output_vstream is null." << std::endl;
+        return HAILO_INVALID_ARGUMENT;
+    }
+
+    if (!buffer || buffer_size == 0) {
+        std::cerr << "Buffer is null or has invalid size." << std::endl;
+        return HAILO_INVALID_ARGUMENT;
+    }
+
+
+        // Cast the handle to OutputVStream
+    auto vstream = static_cast<hailort::OutputVStream*>(output_vstream);
+
+    // Create a MemoryView for the output buffer
+    hailort::MemoryView output_view(buffer, buffer_size);
+    if (!vstream) {
+        std::cerr << "Invalid output_vstream (null pointer)." << std::endl;
+        return HAILO_INVALID_ARGUMENT;
+    }
+
+    // Read data using the MemoryView
+    auto status = vstream->read(output_view);
+
+
+    if (status != HAILO_SUCCESS) {
+        std::cerr << "Failed to read data from output vstream. Status: " << status << std::endl;
     }
 
     return status;
