@@ -67,13 +67,23 @@ mod tests {
         let yolo_network = YoloDetection {
             num_classes: 80,
             max_bboxes_per_class: 100,
-            threshold: 0.5,
+            threshold: 0.85,
         };
 
-        // Prepare a dummy input frame
-        let dummy_frame = vec![0_u8; device_lock.input_frame_size];
+ 
+        // Read the input RGB file
+        let input_file_path = "./images/dog.rgb";
+        let input_data = std::fs::read(input_file_path).expect("Failed to read input file");
+
+        // Verify that the input file size matches the expected input frame size
+        assert_eq!(
+            input_data.len(),
+            device_lock.input_frame_size,
+            "Input file size does not match the expected frame size"
+        );
+
         device_lock
-            .write_input(&dummy_frame)
+            .write_input(&input_data)
             .expect("Failed to write input frame");
 
         // Perform inference and parse output
@@ -87,17 +97,13 @@ mod tests {
             "No detections found; check input or inference pipeline"
         );
 
-        // Print detections for debugging
-        for detection in detections {
-            println!(
-                "Class: {}, Confidence: {:.2}, BBox: ({:.2}, {:.2}, {:.2}, {:.2})",
-                detection.class_id,
-                detection.confidence,
-                detection.bbox.0,
-                detection.bbox.1,
-                detection.bbox.2,
-                detection.bbox.3
-            );
-        }
+        // Check for the presence of the "dog" class (assuming class ID for "dog" is 16)
+        let dog_detected = detections.iter().any(|d| d.class_id == 16 && d.confidence >= 0.5);
+
+        assert!(
+            dog_detected,
+            "Dog was not detected in the image with sufficient confidence"
+        );
+
     }
 }

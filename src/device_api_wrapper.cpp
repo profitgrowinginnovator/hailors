@@ -197,19 +197,31 @@ extern "C" hailo_status hailors_read_output_frame(
     void* buffer,
     size_t buffer_size
 ) {
-    if (!output_vstream || !buffer) {
-        std::cerr << "Invalid output stream handle or buffer." << std::endl;
+    if (!output_vstream) {
+        std::cerr << "output_vstream is null." << std::endl;
         return HAILO_INVALID_ARGUMENT;
     }
+
+    if (!buffer || buffer_size == 0) {
+        std::cerr << "Buffer is null or has invalid size." << std::endl;
+        return HAILO_INVALID_ARGUMENT;
+    }
+
 
         // Cast the handle to OutputVStream
     auto vstream = static_cast<hailort::OutputVStream*>(output_vstream);
 
     // Create a MemoryView for the output buffer
     hailort::MemoryView output_view(buffer, buffer_size);
+    if (!vstream) {
+        std::cerr << "Invalid output_vstream (null pointer)." << std::endl;
+        return HAILO_INVALID_ARGUMENT;
+    }
 
     // Read data using the MemoryView
     auto status = vstream->read(output_view);
+
+
     if (status != HAILO_SUCCESS) {
         std::cerr << "Failed to read data from output vstream. Status: " << status << std::endl;
     }
