@@ -1,15 +1,24 @@
+use std::sync::{Arc, Mutex, MutexGuard};
+use lazy_static::lazy_static; // Add `lazy_static` dependency
+
+lazy_static! {
+    static ref DEVICE_MUTEX: Mutex<()> = Mutex::new(()); // Global Mutex for device access
+}
+
 #[cfg(test)]
 mod tests {
-    
-
-    
-    use std::ptr;
-    use std::sync::{Arc, Mutex};
-
+    use super::*;
     use hailors::{HailoDevice, network::YoloDetection};
+    use std::ptr;
+
+    fn get_device_lock() -> MutexGuard<'static, ()> {
+        DEVICE_MUTEX.lock().unwrap() // Acquire the global lock
+    }
 
     #[test]
     fn test_device_creation_and_release() {
+        let _device_lock = get_device_lock(); // Lock the device for this test
+
         // Create a new HailoDevice
         let hef_path = "./hef/yolov8s_h8.hef";
         let device = Arc::new(Mutex::new(
@@ -19,13 +28,14 @@ mod tests {
         // Verify release of device
         {
             let device_lock = device.lock().unwrap();
-            // Implicit drop will call HailoDevice's `drop` implementation
             assert!(device_lock.device_handle != ptr::null_mut(), "Device handle is null");
         }
     }
 
     #[test]
     fn test_hef_configuration() {
+        let _device_lock = get_device_lock(); // Lock the device for this test
+
         // Create a HailoDevice
         let hef_path = "./hef/yolov8s_h8.hef";
         let device = Arc::new(Mutex::new(
@@ -55,6 +65,8 @@ mod tests {
 
     #[test]
     fn test_yolo_inference() {
+        let _device_lock = get_device_lock(); // Lock the device for this test
+
         // Create a HailoDevice
         let hef_path = "./hef/yolov8s_h8.hef";
         let device = Arc::new(Mutex::new(
@@ -70,7 +82,6 @@ mod tests {
             threshold: 0.85,
         };
 
- 
         // Read the input RGB file
         let input_file_path = "./images/dog.rgb";
         let input_data = std::fs::read(input_file_path).expect("Failed to read input file");
@@ -104,6 +115,5 @@ mod tests {
             dog_detected,
             "Dog was not detected in the image with sufficient confidence"
         );
-
     }
 }

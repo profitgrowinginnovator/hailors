@@ -6,47 +6,35 @@ authors = ["Maarten Ectors <maarten@profitgrowinginnovator.com>"]
 description = "A Rust crate for interfacing with Hailo hardware using FFI bindings."
 homepage = "https://github.com/profitgrowinginnovator/hailors" 
 repository = "https://github.com/profitgrowinginnovator/hailors" 
-documentation = "https://docs.rs/hailors" # for online documentation
+documentation = "https://docs.rs/hailors" # For online documentation
 license = "MIT"
 keywords = ["FFI", "Hailo", "hardware", "bindings", "Rust", "C++"]
 categories = ["embedded", "hardware-support", "scientific-computing"]
 build = "build.rs"
-readme = "README.md" # include the readme for crates.io
+readme = "README.md" # Include the readme for crates.io
 exclude = ["tests/", "hef/*"] 
 
 [dependencies]
-autocxx = { version = "0.27.1", optional = true }
+cxx = "1.0.136"          # For Rust-to-C++ bindings
+anyhow = "1.0.95"        # Error handling
+clap = { version="4.5.26", features = ["derive"] } # CLI argument parsing
+once_cell = "1.20.2"     # Lazy static initialization
+lazy_static = "1.5.0"    # Static initialization
 
-# These dependencies are required for FFI and autocxx integration
-cxx = "1.0.136"
-anyhow = "1.0.95"
-clap = { version="4.5.26", features = ["derive"] }
-once_cell = "1.20.2"
-
-# Include dependencies needed for build.rs to function
 [build-dependencies]
-cc = "1.2.7"
-
-[features]
-default = ["autocxx"]
-test-linking = ["autocxx"]
-
-#[package.metadata]
-#include = ["src/lib.rs", "build.rs"]
+cc = "1.2.7"             # C++ build tool integration
 
 [profile.dev]
-#incremental = false
 debug = true
 
 [package.metadata.docs.rs]
 all-features = true
 
 [lib]
-crate-type = ["rlib", "cdylib"]
+crate-type = ["rlib", "cdylib"]  # For both Rust library and C ABI-compatible library
 name = "hailors"
 path = "src/lib.rs"
 
-
 [[bin]]
-name = "example"  # You can change this name to something meaningful
+name = "hailors-cli" # This will be the CLI binary name
 path = "src/main.rs"
