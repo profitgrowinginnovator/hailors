@@ -55,6 +55,17 @@
         "streambuf": "cpp",
         "thread": "cpp",
         "cfenv": "cpp",
-        "typeinfo": "cpp"
+        "typeinfo": "cpp",
+        "any": "cpp",
+        "cstring": "cpp",
+        "forward_list": "cpp",
+        "list": "cpp",
+        "set": "cpp",
+        "unordered_set": "cpp",
+        "optional": "cpp",
+        "iomanip": "cpp",
+        "cinttypes": "cpp",
+        "typeindex": "cpp",
+        "variant": "cpp"
     }
 }

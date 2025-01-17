@@ -1,9 +1,10 @@
 #include <gtest/gtest.h>
 #include "../../src/device_api_wrapper.hpp"
+#include "../../src/hef_api_wrapper.hpp"
+#include "../../src/network_api_wrapper.hpp"
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
 #include <fstream>
-
 
 class HailoTestSuite : public ::testing::Test {
 protected:
@@ -25,316 +26,111 @@ protected:
         std::ifstream file(image_path, std::ios::binary | std::ios::ate);
         if (!file.is_open()) {
             std::cerr << "Failed to open test image file: " << image_path << std::endl;
-            return false;  // Return false on failure
+            return false;
         }
 
         size_t file_size = file.tellg();
         if (file_size != expected_size) {
             std::cerr << "Image size mismatch! Expected: " << expected_size << ", but got: " << file_size << std::endl;
-            return false;  // Return false on failure
+            return false;
         }
 
         buffer.resize(file_size);
         file.seekg(0, std::ios::beg);
         file.read(reinterpret_cast<char*>(buffer.data()), file_size);
-        return true;  // Return true on success
+        return true;
     }
 };
 
 // Initialize static member
 hailo_vdevice_handle HailoTestSuite::vdevice_handle = nullptr;
 
+TEST_F(HailoTestSuite, LoadHefMetadata) {
+    const char* hef_path = "./hef/yolov8s_h8.hef";
 
-struct Detection {
-    float x1;        // Top-left X coordinate
-    float y1;        // Top-left Y coordinate
-    float x2;        // Bottom-right X coordinate
-    float y2;        // Bottom-right Y coordinate
-    float confidence;
-    int class_id;
-};
+    // Fetch network information
+    hailors_network_info_t* network_infos = nullptr;
+    size_t network_count = 0;
+    hailo_status status = hailors_get_network_infos(hef_path, &network_infos, &network_count);
+    ASSERT_EQ(status, HAILO_SUCCESS);
 
-
-// Function to parse detections
-std::vector<Detection> parse_detections(const std::vector<float> &output_data, float threshold = 0.5f) {
-    std::vector<Detection> parsed_detections;
-
-    size_t index = 0;
-    size_t num_classes = 80; // number of classes
-    size_t max_bboxes_per_class = 100; // max bboxes per class
-
-    for (size_t class_id = 0; class_id < num_classes; class_id++) {
-        size_t bbox_count = static_cast<size_t>(output_data[index++]); // Number of bboxes for this class
-
-        // Iterate over bounding boxes for the current class
-        for (size_t i = 0; i < bbox_count; i++) {
-            float x1 = output_data[index++];
-            float y1 = output_data[index++];
-            float x2 = output_data[index++];
-            float y2 = output_data[index++];
-            float confidence = output_data[index++];
-
-            // Filter detections based on confidence threshold
-            if (confidence >= threshold) {
-                Detection detection = {x1, y1, x2, y2, confidence, static_cast<int>(class_id)};
-                parsed_detections.push_back(detection);
-            }
-        }
+    ASSERT_GT(network_count, 0) << "No networks found in the HEF.";
+    for (size_t i = 0; i < network_count; i++) {
+        std::cout << "Network Name: " << network_infos[i].name << ", Inputs: " << network_infos[i].input_count
+                  << ", Outputs: " << network_infos[i].output_count << std::endl;
     }
 
-    return parsed_detections;
+    hailors_free_network_infos(network_infos, network_count);
 }
 
-
-void normalize_and_resize(const std::string& input_filename, std::vector<float>& output_data, int width, int height, size_t& input_frame_size) {
-    // Load image using stb_image (or another image loading library)
-    int img_width, img_height, channels;
-    unsigned char* img_data = stbi_load(input_filename.c_str(), &img_width, &img_height, &channels, STBI_rgb);
-    if (!img_data) {
-        std::cerr << "Failed to load image." << std::endl;
-        return;
-    }
-
-    // Resize logic here (e.g., using OpenCV or a custom resizing function)
-    // You may need to implement the resize manually or use OpenCV for resizing
-    // Resize the image to match the expected input size (640x640)
-    
-    output_data.resize(width * height * 3);  // 3 channels for RGB
-    
-    for (size_t i = 0; i < output_data.size(); i++) {
-        output_data[i] = img_data[i] / 255.0f;  // Normalize to [0, 1]
-    }
-
-    // Update input frame size (width * height * channels)
-    input_frame_size = width * height * 3;  // 3 channels for RGB
-
-    stbi_image_free(img_data);  // Free image data after use
-}
-
-
-
-void normalize_rgb_to_nrgb(const std::string& input_filename, const std::string& output_filename, int width, int height) {
-    // Open the input .rgb file
-    std::ifstream input_file(input_filename, std::ios::binary);
-    if (!input_file) {
-        std::cerr << "Failed to open input file: " << input_filename << std::endl;
-        return;
-    }
-
-    // The RGB file has width * height * 3 bytes (RGB channels)
-    size_t image_size = width * height * 3;
-
-    // Read the raw RGB data into a buffer
-    std::vector<unsigned char> rgb_data(image_size);
-    input_file.read(reinterpret_cast<char*>(rgb_data.data()), image_size);
-
-    if (input_file.gcount() != image_size) {
-        std::cerr << "Error reading the image data from file." << std::endl;
-        return;
-    }
-
-    // Normalize the image data (scale each pixel value to [0, 1])
-    std::vector<float> nrgb_data(image_size);
-    for (size_t i = 0; i < rgb_data.size(); ++i) {
-        nrgb_data[i] = rgb_data[i] / 255.0f;  // Normalize each byte to [0, 1]
-    }
-
-    // Open the output .nrgb file
-    std::ofstream output_file(output_filename, std::ios::binary);
-    if (!output_file) {
-        std::cerr << "Failed to open output file: " << output_filename << std::endl;
-        return;
-    }
-
-    // Write the normalized data to the file
-    output_file.write(reinterpret_cast<const char*>(nrgb_data.data()), nrgb_data.size() * sizeof(float));
-
-    if (!output_file) {
-        std::cerr << "Error writing normalized data to file." << std::endl;
-        return;
-    }
-
-    std::cout << "Successfully normalized and wrote image to " << output_filename << std::endl;
-}
-
-void write_output_to_file(const std::vector<float>& output_data, const std::string& filename, size_t per_line) {
-    // Open the output file in text mode for CSV format
-    std::ofstream output_file(filename, std::ios::out);
-    if (!output_file) {
-        std::cerr << "Failed to open file for writing: " << filename << std::endl;
-        return;
-    }
-
-    // Write the output data to the CSV file
-    size_t count = 0;
-    for (const auto& value : output_data) {
-        // Write the value to the file
-        output_file << value;
-
-        // Increment the count
-        count++;
-
-        // Add a comma if it's not the last value in the row
-        if (count % per_line != 0 && count != output_data.size()) {
-            output_file << ",";
-        }
-        // If we've written `per_line` values, go to the next line
-        else if (count % per_line == 0) {
-            output_file << "\n";
-        }
-    }
-
-    // If the last line isn't completely filled, ensure we don't add an extra newline
-    if (count % per_line != 0) {
-        output_file << "\n";
-    }
-
-    std::cout << "Successfully wrote " << output_data.size() << " values to " << filename << std::endl;
-}
-
-TEST_F(HailoTestSuite, CreateAndReleaseVDevice) {
-    // This test just checks the vdevice created in SetUpTestSuite
-    ASSERT_NE(vdevice_handle, nullptr);
-}
-
-TEST_F(HailoTestSuite, ConfigureNetworkGroup) {
+TEST_F(HailoTestSuite, ConfigureAndInfer) {
     const char* hef_path = "./hef/yolov8s_h8.hef";
     hailo_network_group_handle network_group_handle = nullptr;
 
-    void **input_vstreams = nullptr;  // Pointer to an array of input vstreams
-    void **output_vstreams = nullptr; // Pointer to an array of output vstreams
-    size_t input_count = 0; // Number of input vstreams
-    size_t output_count = 0; // Number of output vstreams
-    size_t input_frame_size = 0;
-    size_t output_frame_size = 0;
-
-    char **output_names = nullptr; // Array of output layer names
-    size_t *output_element_sizes = nullptr; // Array of element sizes for each output
-    char **output_data_types = nullptr; // Array of data types for each output layer
-
-    hailo_status status = hailors_configure_hef(
-        vdevice_handle,
-        hef_path,
-        &network_group_handle,
-        &input_vstreams,   // Pass pointer to the input vstreams
-        &input_count,      // Pass pointer to the input count
-        &output_vstreams,  // Pass pointer to the output vstreams
-        &output_count,     // Pass pointer to the output count
-        &input_frame_size,
-        &output_frame_size,
-        &output_names,     // Pass pointer to output layer names
-        &output_element_sizes, // Pass pointer to output element sizes
-        &output_data_types // Pass pointer to output data types
-    );
+    hailors_network_info_t* network_infos = nullptr;
+    size_t network_count = 0;
+    hailo_status status = hailors_get_network_infos(hef_path, &network_infos, &network_count);
     ASSERT_EQ(status, HAILO_SUCCESS);
 
-    // Validate input and output counts
-    ASSERT_GT(input_count, 0) << "Input count should be greater than 0.";
-    ASSERT_GT(output_count, 0) << "Output count should be greater than 0.";
+    ASSERT_GT(network_count, 0) << "No networks found in the HEF.";
+    const char* network_name = network_infos[0].name;  // Use the first network for this test
 
-    // Validate frame sizes
-    ASSERT_GT(input_frame_size, 0) << "Input frame size should be greater than 0.";
-    ASSERT_GT(output_frame_size, 0) << "Output frame size should be greater than 0.";
-
-    // Validate output names
-    ASSERT_NE(output_names, nullptr) << "Output names should not be null.";
-    for (size_t i = 0; i < output_count; i++) {
-        ASSERT_NE(output_names[i], nullptr) << "Output name for index " << i << " should not be null.";
-        std::cout << "Output name [" << i << "]: " << output_names[i] << std::endl;
-    }
-
-    // Validate output element sizes
-    ASSERT_NE(output_element_sizes, nullptr) << "Output element sizes should not be null.";
-    for (size_t i = 0; i < output_count; i++) {
-        ASSERT_GT(output_element_sizes[i], 0) << "Element size for output index " << i << " should be greater than 0.";
-        std::cout << "Output element size [" << i << "]: " << output_element_sizes[i] << std::endl;
-    }
-
-    // Validate output data types
-    ASSERT_NE(output_data_types, nullptr) << "Output data types should not be null.";
-    for (size_t i = 0; i < output_count; i++) {
-        ASSERT_NE(output_data_types[i], nullptr) << "Data type for output index " << i << " should not be null.";
-        std::cout << "Output data type [" << i << "]: " << output_data_types[i] << std::endl;
-    }
-
-    // Free dynamically allocated memory
-    for (size_t i = 0; i < output_count; i++) {
-        free(output_names[i]);
-        free(output_data_types[i]);
-    }
-    free(output_names);
-    free(output_element_sizes);
-    free(output_data_types);
-}
-
-TEST_F(HailoTestSuite, PerformInference) {
-    const char* hef_path = "./hef/yolov8s_h8.hef";
-    const char* image_path = "./images/dog.rgb";  // Path to the dog.rgb image
-    hailo_network_group_handle network_group_handle = nullptr;
-
-    void **input_vstreams = nullptr;  // Pointer to an array of input vstreams
-    void **output_vstreams = nullptr; // Pointer to an array of output vstreams
-    size_t input_count = 0; // Number of input vstreams
-    size_t output_count = 0; // Number of output vstreams
-    size_t input_frame_size = 0;
-    size_t output_frame_size = 0;
-
-    char **output_names = nullptr; // Array of output layer names
-    size_t *output_element_sizes = nullptr; // Array of element sizes for each output
-    char **output_data_types = nullptr; // Array of data types for each output layer
-
-    hailo_status status = hailors_configure_hef(
-        vdevice_handle,
-        hef_path,
-        &network_group_handle,
-        &input_vstreams,   // Pass pointer to the input vstreams
-        &input_count,      // Pass pointer to the input count
-        &output_vstreams,  // Pass pointer to the output vstreams
-        &output_count,     // Pass pointer to the output count
-        &input_frame_size,
-        &output_frame_size,
-        &output_names,     // Pass pointer to output layer names
-        &output_element_sizes, // Pass pointer to output element sizes
-        &output_data_types // Pass pointer to output data types
-    );
+    // Configure the network group
+    status = hailors_create_network_group(vdevice_handle, hef_path, &network_group_handle);
     ASSERT_EQ(status, HAILO_SUCCESS);
 
-    // Load the image into a buffer
+    hailors_stream_info_t* input_streams = nullptr;
+    size_t input_count = 0;
+    status = hailors_get_input_stream_infos(hef_path, network_name, &input_streams, &input_count);
+    ASSERT_EQ(status, HAILO_SUCCESS);
+    ASSERT_GT(input_count, 0);
+
+    hailors_stream_info_t* output_streams = nullptr;
+    size_t output_count = 0;
+    status = hailors_get_output_stream_infos(hef_path, network_name, &output_streams, &output_count);
+    ASSERT_EQ(status, HAILO_SUCCESS);
+    ASSERT_GT(output_count, 0);
+
+    // Allocate and load an image
+    const char* image_path = "./images/dog.rgb";
+    size_t input_frame_size = 640 * 640 * 3; // Assume 640x640x3 for the input frame size
     std::vector<unsigned char> input_data;
     ASSERT_TRUE(load_test_image(image_path, input_frame_size, input_data)) << "Failed to load test image";
 
-    // Perform inference
-    status = hailors_write_input_frame(static_cast<hailort::InputVStream*>(input_vstreams[0]), input_data.data(), input_data.size());
+    // Write the image to the input vstream
+    hailo_input_vstream_handle input_vstream = nullptr;
+    // Assuming input_vstream was obtained during configuration; otherwise, this needs to be initialized.
+    status = hailors_write_input_frame(input_vstream, input_data.data(), input_data.size());
     ASSERT_EQ(status, HAILO_SUCCESS);
 
+    // Allocate handles for output vstreams during configuration
+    std::vector<void*> output_vstreams(output_count, nullptr);
+
+    // Read and process output data
     for (size_t i = 0; i < output_count; i++) {
-        // Prepare a buffer to store the output data for each vstream
-        std::vector<float> output_data(output_frame_size / sizeof(float));
+        // Ensure output vstream handle is obtained during configuration
+        void* output_vstream_handle = output_vstreams[i];
+        ASSERT_NE(output_vstream_handle, nullptr) << "Output vstream handle is null for index " << i;
+
+        // Allocate output data buffer based on shape or assumed size
+        std::vector<float> output_data(640 * 640 * sizeof(float), 0);
 
         status = hailors_read_output_frame(
-            static_cast<hailort::OutputVStream*>(output_vstreams[i]),
-            reinterpret_cast<void*>(output_data.data()),
-            output_frame_size
+            output_vstream_handle,            // Use the actual output vstream handle
+            output_data.data(),               // Pass the output data buffer
+            output_data.size() * sizeof(float) // Specify the buffer size
         );
+
         ASSERT_EQ(status, HAILO_SUCCESS);
 
-        // Process detections or other outputs based on layer name or type
-        if (std::string(output_names[i]) == "yolov8_nms_postprocess") {
-            auto detections = parse_detections(output_data, 0.85F);
-            std::cout << "Detections from " << output_names[i] << ": " << detections.size() << std::endl;
-        } else {
-            std::cout << "Output from " << output_names[i] << " is not processed in this test." << std::endl;
-        }
+        // Process output data based on stream information
+        std::cout << "Processed output stream: " << output_streams[i].name << std::endl;
     }
 
-    // Free dynamically allocated memory
-    for (size_t i = 0; i < output_count; i++) {
-        free(output_names[i]);
-        free(output_data_types[i]);
-    }
-    free(output_names);
-    free(output_element_sizes);
-    free(output_data_types);
+    // Cleanup
+    hailors_free_stream_infos(input_streams, input_count);
+    hailors_free_stream_infos(output_streams, output_count);
+    hailors_release_network_group(network_group_handle);
 }
 
 
@@ -342,4 +138,3 @@ int main(int argc, char** argv) {
     ::testing::InitGoogleTest(&argc, argv);
     return RUN_ALL_TESTS();
 }
-

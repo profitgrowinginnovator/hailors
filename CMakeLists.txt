@@ -20,6 +20,8 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src)
 # Add the source files for the shared library
 add_library(hailors SHARED 
     src/device_api_wrapper.cpp
+    src/network_api_wrapper.cpp
+    src/hef_api_wrapper.cpp
 )
 
 # Link against the required Hailo runtime library
@@ -34,10 +36,27 @@ set_target_properties(hailors PROPERTIES
 )
 
 # ======================
+# Add nlohmann/json
+# ======================
+# Download and add the nlohmann/json library
+include(FetchContent)
+FetchContent_Declare(
+  nlohmann_json
+  GIT_REPOSITORY https://github.com/nlohmann/json.git
+  GIT_TAG v3.11.2  # Use a stable release tag
+)
+
+FetchContent_MakeAvailable(nlohmann_json)
+
+
+# Link the library to the hailors target
+target_include_directories(hailors PUBLIC ${nlohmann_json_SOURCE_DIR}/include)
+target_compile_definitions(hailors PUBLIC -DUSE_NLOHMANN_JSON)
+
+# ======================
 # Google Test Integration
 # ======================
 # Download Google Test if not installed
-include(FetchContent)
 FetchContent_Declare(
   googletest
   URL https://github.com/google/googletest/archive/refs/tags/release-1.12.1.zip
