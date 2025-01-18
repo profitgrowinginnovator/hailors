@@ -1,4 +1,4 @@
-use std::ffi::{CString, c_void};
+/* use std::ffi::{CString, c_void};
 use std::ptr;
 use anyhow::Result;
 
@@ -180,7 +180,7 @@ impl HailoDevice {
             }
     
             // Convert the raw data to f32 using the helper method
-            let converted_data = match self.output_data_types[i].as_str() {
+            let parsed_data = match self.output_data_types[i].as_str() {
                 "UINT8" => self.convert_data(&output_data, &DataType::Uint8, &DataType::Float32),
                 "FLOAT32" => self.convert_data(&output_data, &DataType::Float32, &DataType::Float32),
                 "UINT16" => self.convert_data(&output_data, &DataType::Uint16, &DataType::Float32),
@@ -243,3 +243,4 @@ extern "C" {
     /// Releases a Hailo virtual device.
     fn hailors_release_vdevice(device_handle: *mut c_void) -> HailoStatus;
 }
+*/

@@ -1,120 +1,140 @@
-#include "hailo/hef.hpp"
-#include "hef_api_wrapper.hpp"
-
-#include <cstring>
+#include "network_api_wrapper.hpp"
+#include "device_api_wrapper.hpp"
+#include "hailo/hailort.hpp"
 #include <vector>
-#include <string>
+#include <thread>
+#include <iostream>
+#include <cstring>
 
-extern "C" {
+using namespace hailort;
 
-hailo_status hailors_initialize_hef(const char* hef_path, hailort::Hef** hef_out,
-                                    hailors_network_info_t** network_infos, size_t* network_count,
-                                    char*** stream_names, size_t* stream_count) {
-    if (!hef_out || !network_infos || !network_count || !stream_names || !stream_count) {
+extern "C" hailo_status hailors_create_network_group(hailo_vdevice_handle vdevice, const char *hef_path, hailo_network_group_handle *network_group)
+{
+    if (!vdevice || !hef_path || !network_group) {
+        std::cerr << "Invalid arguments passed to hailors_create_network_group." << std::endl;
         return HAILO_INVALID_ARGUMENT;
     }
 
-    // Create the Hef object
-    auto hef_result = hailort::Hef::create(hef_path);
+    auto vdevice_ptr = static_cast<VDevice *>(vdevice);
+    auto hef_result = Hef::create(hef_path);
     if (!hef_result) {
+        std::cerr << "Failed to create HEF: " << hef_result.status() << std::endl;
         return hef_result.status();
     }
+    auto hef = std::move(hef_result.value());
 
-    *hef_out = new hailort::Hef(std::move(hef_result.value()));
+    auto configure_params = vdevice_ptr->create_configure_params(hef);
+    if (!configure_params) {
+        std::cerr << "Failed to create configure params: " << configure_params.status() << std::endl;
+        return configure_params.status();
+    }
 
-    // Get network info
-    auto network_groups_result = (*hef_out)->get_network_infos();
-    if (!network_groups_result) {
-        delete *hef_out;
-        *hef_out = nullptr;
+    auto network_groups_result = vdevice_ptr->configure(hef, configure_params.value());
+    if (!network_groups_result || network_groups_result->empty()) {
+        std::cerr << "Failed to configure network groups: " << network_groups_result.status() << std::endl;
         return network_groups_result.status();
     }
 
-    const auto& network_groups = network_groups_result.value();
-    *network_count = network_groups.size();
+    *network_group = network_groups_result.value()[0].get();
+    return HAILO_SUCCESS;
+}
 
-    // Allocate memory for network info
-    *network_infos = static_cast<hailors_network_info_t*>(malloc(network_groups.size() * sizeof(hailors_network_info_t)));
-    if (!*network_infos) {
-        delete *hef_out;
-        *hef_out = nullptr;
-        return HAILO_OUT_OF_HOST_MEMORY;
-    }
+extern "C" hailo_status hailors_release_network_group(hailo_network_group_handle network_group)
+{
+    delete static_cast<ConfiguredNetworkGroup *>(network_group);
+    return HAILO_SUCCESS;
+}
 
-    for (size_t i = 0; i < network_groups.size(); i++) {
-        strncpy((*network_infos)[i].name, network_groups[i].name, HAILO_MAX_NETWORK_NAME_SIZE);
-        (*network_infos)[i].name[HAILO_MAX_NETWORK_NAME_SIZE - 1] = '\0'; // Null-terminate
-    }
-
-    // Get input stream names for the first network
-    if (network_groups.empty()) {
-        free(*network_infos);
-        *network_infos = nullptr;
-        *network_count = 0;
-        delete *hef_out;
-        *hef_out = nullptr;
+extern "C" hailo_status hailors_release_input_vstream(hailo_input_vstream_handle input_vstream)
+{
+    if (!input_vstream) {
+        std::cerr << "Invalid input_vstream handle provided to hailors_release_input_vstream." << std::endl;
         return HAILO_INVALID_ARGUMENT;
     }
 
-    auto input_streams_result = (*hef_out)->get_input_vstream_infos(network_groups[0].name);
-    if (!input_streams_result) {
-        free(*network_infos);
-        *network_infos = nullptr;
-        *network_count = 0;
-        delete *hef_out;
-        *hef_out = nullptr;
-        return input_streams_result.status();
+    // Cast the handle to the InputVStream and delete it
+    delete static_cast<hailort::InputVStream*>(input_vstream);
+}
+
+extern "C" hailo_status hailors_write_input_frame(
+    hailo_input_vstream_handle input_vstream,
+    const void* data,
+    size_t data_size
+) {
+    if (!input_vstream || !data) {
+        std::cerr << "Invalid input stream handle or data buffer." << std::endl;
+        return HAILO_INVALID_ARGUMENT;
     }
 
-    const auto& input_streams = input_streams_result.value();
-    *stream_count = input_streams.size();
+    // Cast the handle to InputVStream
+    auto vstream = static_cast<hailort::InputVStream*>(input_vstream);
 
-    // Allocate memory for stream names
-    *stream_names = static_cast<char**>(malloc(input_streams.size() * sizeof(char*)));
-    if (!*stream_names) {
-        free(*network_infos);
-        *network_infos = nullptr;
-        *network_count = 0;
-        delete *hef_out;
-        *hef_out = nullptr;
-        return HAILO_OUT_OF_HOST_MEMORY;
+    // Create a MemoryView for the input data (casting to `void*`)
+    hailort::MemoryView input_view(const_cast<void*>(data), data_size);
+
+    // Write data using the MemoryView
+    auto status = vstream->write(input_view);
+    if (status != HAILO_SUCCESS) {
+        std::cerr << "Failed to write data to input vstream. Status: " << status << std::endl;
     }
 
-    for (size_t i = 0; i < input_streams.size(); i++) {
-        (*stream_names)[i] = strdup(input_streams[i].name);
-        if (!(*stream_names)[i]) {
-            for (size_t j = 0; j < i; j++) {
-                free((*stream_names)[j]);
-            }
-            free(*stream_names);
-            *stream_names = nullptr;
-            free(*network_infos);
-            *network_infos = nullptr;
-            *network_count = 0;
-            delete *hef_out;
-            *hef_out = nullptr;
-            return HAILO_OUT_OF_HOST_MEMORY;
-        }
+    return status;
+}
+
+/**
+ * @brief Releases a previously created output vstream.
+ *
+ * This function deallocates resources associated with the given output vstream.
+ *
+ * @param[in] output_vstream The output vstream handle to release.
+ * @return HAILO_SUCCESS on success, or an appropriate error code on failure.
+ */
+extern "C" hailo_status hailors_release_output_vstream(void* output_vstream)
+{
+    if (!output_vstream) {
+        std::cerr << "Invalid output_vstream handle provided to hailors_release_output_vstream." << std::endl;
+        return HAILO_INVALID_ARGUMENT;
     }
+
+    // Cast the handle to the OutputVStream and delete it
+    delete static_cast<hailort::OutputVStream*>(output_vstream);
 
     return HAILO_SUCCESS;
 }
 
-// Cleanup function to release all resources
-void hailors_cleanup(hailort::Hef* hef, hailors_network_info_t* network_infos, size_t network_count,
-                     char** stream_names, size_t stream_count) {
-    if (hef) {
-        delete hef;
+extern "C" hailo_status hailors_read_output_frame(
+    void* output_vstream, 
+    void* buffer,
+    size_t buffer_size
+) {
+    if (!output_vstream) {
+        std::cerr << "output_vstream is null." << std::endl;
+        return HAILO_INVALID_ARGUMENT;
     }
-    if (network_infos) {
-        free(network_infos);
-    }
-    if (stream_names) {
-        for (size_t i = 0; i < stream_count; i++) {
-            free(stream_names[i]);
-        }
-        free(stream_names);
-    }
-}
 
+    if (!buffer || buffer_size == 0) {
+        std::cerr << "Buffer is null or has invalid size." << std::endl;
+        return HAILO_INVALID_ARGUMENT;
+    }
+
+
+        // Cast the handle to OutputVStream
+    auto vstream = static_cast<hailort::OutputVStream*>(output_vstream);
+
+    // Create a MemoryView for the output buffer
+    hailort::MemoryView output_view(buffer, buffer_size);
+    if (!vstream) {
+        std::cerr << "Invalid output_vstream (null pointer)." << std::endl;
+        return HAILO_INVALID_ARGUMENT;
+    }
+
+    // Read data using the MemoryView
+    auto status = vstream->read(output_view);
+
+
+    if (status != HAILO_SUCCESS) {
+        std::cerr << "Failed to read data from output vstream. Status: " << status << std::endl;
+    }
+
+    return status;
 }

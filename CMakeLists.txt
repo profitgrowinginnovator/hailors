@@ -13,9 +13,22 @@ endif()
 # Set debug flags (e.g., -g for debugging symbols and -O0 to disable optimizations)
 set(CMAKE_CXX_FLAGS_DEBUG "-g -O0")
 
+# FetchContent setup for spdlog
+include(FetchContent)
+FetchContent_Declare(
+    spdlog
+    GIT_REPOSITORY https://github.com/gabime/spdlog
+    GIT_TAG 27cb4c76708608465c413f6d0e6b8d99a4d84302 # version 1.14.1
+)
+FetchContent_MakeAvailable(spdlog)
+
+
 # Include the Hailo header files
 include_directories("/usr/include/hailo")
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src)
+
+
+
 
 # Add the source files for the shared library
 add_library(hailors SHARED 
@@ -24,17 +37,23 @@ add_library(hailors SHARED
     src/hef_api_wrapper.cpp
 )
 
-# Link against the required Hailo runtime library
-target_link_libraries(hailors hailort)
 
 # Include directory for Rust's FFI generation
 target_include_directories(hailors PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
+
+# Add target include directories for specific components
+target_include_directories(hailors PRIVATE ${CMAKE_SOURCE_DIR}/include)
+
 
 # Ensure that the output is placed correctly for Rust bindings
 set_target_properties(hailors PROPERTIES
     LIBRARY_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/../"
 )
 
+# ======================
+# Add nlohmann/json
+# ======================
+# Download and add the nlohmann/json library
 # ======================
 # Add nlohmann/json
 # ======================
@@ -47,6 +66,16 @@ FetchContent_Declare(
 )
 
 FetchContent_MakeAvailable(nlohmann_json)
+
+
+
+# Link xxhash to hailors
+target_link_libraries(hailors
+    PRIVATE hailort
+    PUBLIC nlohmann_json::nlohmann_json
+)
+
+
 
 
 # Link the library to the hailors target
